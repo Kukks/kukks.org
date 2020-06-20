@@ -8,7 +8,7 @@ $(document).ready(function(){
   $("#btn-go").on("click", function(){ 
   try {
   alert(navigator.registerProtocolHandler("bitcoin", "https://www.kukks.org/%s", "Test") );
-  }catch(e){alert("error: e")}
+  }catch(e){alert("error: "+ e)}
   })
 });
 </script>
