@@ -1,152 +1,328 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="uie" data-theme="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kukks - Software Consultancy</title>
-    <link rel="stylesheet" href="assets/css/bootstrap.css" />
-    <link rel="stylesheet" href="assets/css/font-awesome.min.css" />
-    <link rel="stylesheet" href="assets/css/creative.css.css" />
-    <link rel="stylesheet" href="assets/css/default-dark.css" />
-    <link rel="stylesheet" href="assets/css/Montserrat.css" />
-    <link rel="stylesheet" href="assets/css/OpenSans.css" />
+    <!--    <link type="text/css" href="/assets/css/btcpayserver-variables.css" rel="stylesheet" />-->
+    <!--    <link type="text/css" href="/assets/css/btcpayserver-bootstrap.css" rel="stylesheet" />-->
+    <!--    <link type="text/css" href="/assets/css/btcpayserver-main.css" rel="stylesheet" />-->
 
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <script>if (!window.btcpay) { var head = document.getElementsByTagName('head')[0]; var script = document.createElement('script'); script.src = 'https://btcpay.kukks.org/modal/btcpay.js'; script.type = 'text/javascript'; head.append(script); } function onBTCPayFormSubmit(event) { var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange = function () { if (this.readyState == 4 && this.status == 200) { if (this.status == 200 && this.responseText) { var response = JSON.parse(this.responseText); window.btcpay.showInvoice(response.invoiceId); } } }; xhttp.open("POST", event.target.getAttribute('action'), true); xhttp.send(new FormData(event.target)); }</script>
-    <style type="text/css">
-        .btcpay-form {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
+    <style>
+        h1 {
+            font-size: 3rem;
+            margin: 0;
         }
 
-        .btcpay-form--inline {
-            flex-direction: row;
+        p.lead {
+            font-size: 2.5rem;
+            margin: 2rem;
         }
 
-        .btcpay-form--block {
-            flex-direction: column;
-        }
+        body, html {
+            /*backjgropund color gradient of dark blue fading to black*/
+            color: white;
+            font-family: 'Courier New', monospace;
+            margin: 2rem;
 
-        .btcpay-form--inline .submit {
-            margin-left: 15px;
-        }
-
-        .btcpay-form--block select {
-            margin-bottom: 10px;
-        }
-
-        .btcpay-form .btcpay-custom-container {
-            text-align: center;
-        }
-
-        .btcpay-custom {
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .btcpay-form .plus-minus {
-            cursor: pointer;
-            font-size: 25px;
-            line-height: 25px;
-            background: #DFE0E1;
-            height: 30px;
-            width: 45px;
-            border: none;
-            border-radius: 60px;
-            margin: auto 5px;
-            display: inline-flex;
+
+        #bg {
+            background: linear-gradient(180deg, #00001c 0%, rgba(0, 0, 0, 1) 80%, rgba(0, 0, 0, 1) 100%);
+            width: 100%;
+            height: 100%;
+            left: 0;
+            top: 0;
+            position: fixed;
+            z-index: -100;
+        }
+
+        a {
+            color: white;
+            text-decoration: none;
+        }
+
+        a:hover {
+            font-weight: bold;
+        }
+
+        .box-container {
+
+            display: flex;
+            flex-wrap: wrap;
             justify-content: center;
         }
 
-        .btcpay-form select {
-            -moz-appearance: none;
-            -webkit-appearance: none;
-            appearance: none;
-            color: currentColor;
-            background: transparent;
-            border: 1px solid transparent;
-            display: block;
-            padding: 1px;
-            margin-left: auto;
-            margin-right: auto;
-            font-size: 11px;
+        .box {
+            border-radius: 5%;
+            background-color: rgba(255, 255, 255, 0.2);
+
+            margin: 10px;
+            padding: 10px;
+        }
+
+        a.box:hover {
+            background-color: rgba(255, 255, 255, 0.4);
+        }
+
+        #fire {
+            z-index: -1;
+            height: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
             cursor: pointer;
         }
 
-        .btcpay-form select:hover {
-            border-color: #ccc;
+        #pause-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.0);
+            border: none;
+            color: white;
+            padding: 10px;
+            border-radius: 33%;
+            cursor: pointer;
         }
 
-        #btcpay-input-price {
-            -moz-appearance: none;
-            -webkit-appearance: none;
-            border: none;
-            box-shadow: none;
-            text-align: center;
-            font-size: 25px;
-            margin: auto;
+
+        #pause-button:hover {
+            background-color: rgba(0, 0, 0, 0.9);
+        }
+
+        #pause-button .tooltip {
+            position: absolute;
+            top: 50px;
+            right: 50px;
+            transform: translateX(50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px;
             border-radius: 5px;
-            line-height: 35px;
-            background: #fff;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        #pause-button:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
         }
     </style>
-    <link href="https://assets.calendly.com/assets/external/widget.css" rel="stylesheet">
-    <script src="https://assets.calendly.com/assets/external/widget.js" type="text/javascript"></script>
 </head>
 
 <body>
-    <div class="container">
-        <div class="row">
-            <h1 class="col-12 text-center mt-md-4">Andrew Camilleri / Kukks</h1>
-        </div>
-        <div class="row">
-            <div class="col-md-6 text-center">
-                <img src="assets/images/me1.jpeg" class=" img-fluid d-none d-md-block " />
-                <img src="assets/images/me2.jpeg" style="max-width: 400px;"
-                    class=" img-fluid rounded-circle d-xs-block d-md-none mb-3" />
-            </div>
-            <div class="col-md-6">
-                <p>I'm a full-stack software consultant based in Denmark/Malta and mostly specializing in web-focused
-			.NET applications that work within the <a href="bitcoin.pdf" target="_blank">Bitcoin</a> ecosystem.</p>
-                <p>
-                    I've worked in various IT industries over the years, from investment to iGaming software. I
-                    currently contribute and work on projects around <a target="_blank" href="https://btcpayserver.org/">BTCPay Server</a>, an
-                    open-source, self-hosted Bitcoin payment processor using dotnet. </p>
-		    
 
-                <div class="bg-light p-2">
-                    <p>If you think I've helped you in some way and wish to support my work, or just wish to see a quick
-                        demo of the awesome-ness that BTCPay Server offers, consider sending me a donation:</p>
-                    <div class="d-flex justify-content-center m-4 ">
-                      
-                            <a href="https://kukks.org/api/v1/invoices?storeId=AGZDaipGt9WGwjdQ7cemFynFkZY3XxVbKVbV9izBNAA&currency=EUR"  class="btn btn-primary"
-                                style="min-width:209px; min-height:57px; border-radius: 4px;border-style: none;background-color: #0f3b21;"
-                                alt="Pay with BtcPay, Self-Hosted Bitcoin Payment Processor"><span
-                                    style="color:#fff">Donate
-                                    with</span><img src="https://kukks.org/img/paybutton/logo.svg" style="height:57px;display:inline-block;padding:5% 0 5% 5px;vertical-align:middle;">
-
-                            </a>
-                    </div>
-                </div>
-                <p class="mt-2">I offer consultancy services in case you need custom solutions. Feel free to reach out to me if you have a project in mind and wish to collaborate! </p>
-
-                <div class="d-flex justify-content-center">
-                    <a target="_blank" href="https://www.linkedin.com/in/camilleriandrew/" title="LinkedIn"> <i
-                            class="fab fa-linkedin h2 mr-2"></i></a>
-                    <a target="_blank" href="https://github.com/kukks" title="Github"><i class="fab fa-github h2 mr-2"></i></a>
-                    <a target="_blank" href="https://twitter.com/mrkukks" title="Twitter"> <i class="fab fa-twitter h2 mr-2"></i></a>
-                    <a target="_blank" href="mailto:drewcamilleri@gmail.com?Subject=Enquiring%20about%20your%20awesomeness"
-                        title="Send an email"><i class="fas fa-envelope h2"></i></a>
-                </div>
-            </div>
-        </div>
+<div id="bg"></div>
+<canvas id="fire"></canvas>
+<div class="container">
+    <div style="text-align: center">
+        <h1>Kukks Tech</h1>
+        <p class="lead">Freedom tech for an unfree world</p>
     </div>
+
+
+    <!--    <div class="box-container">-->
+    <!--        <a class="box" href="https://www.kukks.org/bitcoin.pdf">Bitcoin</a>-->
+    <!--        <a class="box" href="https://btcpayserver.org">BTCPay Server</a>-->
+    <!--        <div class="box" onclick="openModal('modal2')">Coinjoin</div>-->
+    <!--        <div class="box" onclick="openModal('modal3')">Nostr</div>-->
+    <!--        <div class="box" onclick="openModal('modal4')">sdad</div>-->
+    <!--        <div class="box" onclick="openModal('modal5')">Contact</div>-->
+    <!--    </div>-->
+
+    <div class="box" style="padding: 2rem;">
+        <p>
+            My name is Andrew Camilleri, and usually go by the online handle Kukks.</p>
+        <p>
+            I am a software consultant with a focus on dotnet and <a href="bitcoin.pdf" target="_blank">Bitcoin</a>.
+            My passion is to build solutions that help empower others to reclaim their sovereignty, in a world that
+            moves to eradicate it.
+
+            Practically everything I build is free, open source, and openly licensed.
+        </p>
+        <p>Almost all my work revolves around <a href="bitcoin.pdf" target="_blank">Bitcoin</a>.
+            It's simply the greatest technology that I can work on to provide the most meaningful impact.
+            As the world around us tightens its grip on our freedoms, Bitcoin provides us a way to reclaim our financial
+            freedom and fight back.
+        </p>
+        <p>
+            Feel free to reach out to me on any of the following platforms:
+        </p>
+        <div class="box-container">
+
+            <a class="box" target="_blank"
+               href="https://x.com/mrkukks">X</a>
+            <a class="box" target="_blank"
+               href="nostr:npub1y24gz5gwucl79vtv4ctwpysl0r5m4xyzu2rgulnr44ks3t5mt92q4nz2ad">Nostr</a>
+            <a class="box" target="_blank"
+               href="https://signal.me/#eu/njn1nz-dziKTpDfuO5Cgg8B_OnkiMiH1R11vo0hXdGaLF0n9Yc9GCb1utRqLJV0m">Signal</a>
+            <a class="box" target="_blank"
+               href="https://t.me/mrkukks">Telegram</a>
+            <a class="box" target="_blank" href="https://github.com/Kukks">Github</a>
+            <a class="box" target="_blank" href="admin@kukks.org">Email</a> 
+            <a class="box" target="_blank" href="https://keet-mobile.onelink.me/86GX/invite?af_qr=c">Keet</a>
+        </div>
+        <div class="box-container">
+            <a class="box" target="_blank"
+               href="https://keybase.io/kukks/pgp_keys.asc">PGP: 8E55 30D9 D1C9 3097</a>
+        </div>
+        <hr/>
+
+        <div style="text-align: center; padding: 2rem;">None of my work would be possible without the generous donations
+            of my peers. To date, I have
+            received 3 direct grants, two from Spiral and one from BTSE. Additionally, I am also funded through the <a
+                    target="_blank" href="https://foundation.btcpayserver.org/">BTCPay Foundation</a> which has had an
+            unbelievable lineup of sponsors through the years. I am forever grateful. I also accept
+            donations through:
+            <div class="box-container">
+                <a class="box" target="_blank"
+                   href="https://btcpay.kukks.org/api/v1/invoices?storeId=AGZDaipGt9WGwjdQ7cemFynFkZY3XxVbKVbV9izBNAA&currency=EUR">Bitcoin</a>
+                <a class="box"
+                   href="lightning:kukks@kukks.org">LN Address</a>
+                <a class="box" target="_blank" href="https://github.com/sponsors/Kukks">Github Sponsors</a>
+            </div>
+        </div>
+
+        <!--        <hr/>-->
+        <!--        <div  style="text-align: center; padding: 2rem; align-items: center; display: flex; flex-direction: column;"  >Some of my notable work includes:-->
+        <!--            <div class="box-container" style="flex-direction: column;width: fit-content;">-->
+        <!--                <div class="box">BTCPay Server Core maintainer</div>-->
+        <!--                <div class="box">Wabisabi Coinjoins</div>-->
+        <!--                <div class="box">BTCPay Server App (in development)</div>-->
+        <!--                <div class="box">Nostr</div>-->
+        <!--                <div class="box">LNURL</div>-->
+        <!--            </div>-->
+        <!--    </div>-->
+
+
+    </div>
+</div>
+
+
+<!-- Modals -->
+<div id="modal1" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('modal1')">&times;</span>
+        <p>BTCPay Server Project Details...</p>
+    </div>
+</div>
+
+<div id="modal2" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('modal2')">&times;</span>
+        <p>Coinjoin Project Details...</p>
+    </div>
+</div>
+
+<div id="modal3" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('modal3')">&times;</span>
+        <p>Nostr Project Details...</p>
+    </div>
+</div>
+
+<div id="modal4" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('modal4')">&times;</span>
+        <p>sdad Project Details...</p>
+    </div>
+</div>
+
+<div id="modal5" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('modal5')">&times;</span>
+        <p>Contact Details...</p>
+    </div>
+</div>
+
+
+<button id="pause-button">
+    ⏸
+    <span class="tooltip">Pause</span>
+</button>
+
+<script type="text/javascript" charset="utf-8" src="/assets/perlin.js"></script>
+<script type="text/javascript" charset="utf-8" src="/assets/fire.js"></script>
+<script>
+    function openModal(modalId) {
+        document.getElementById(modalId).style.display = "flex";
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = "none";
+    }
+
+    if (!window.btcpay) {
+        var script = document.createElement('script');
+        script.src = "https://btcpay.kukks.org/modal/btcpay.js";
+        document.getElementsByTagName('head')[0].append(script);
+    }
+
+    function handleFormSubmit(event) {
+        event.preventDefault();
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200 && this.responseText) {
+                window.btcpay.appendInvoiceFrame(JSON.parse(this.responseText).invoiceId);
+            }
+        };
+        xhttp.open('POST', event.target.getAttribute('action'), true);
+        xhttp.send(new FormData(event.target));
+    }
+
+    document.querySelectorAll(".btcpay-form").forEach(function (el) {
+        if (!el.dataset.initialized) {
+            el.addEventListener('submit', handleFormSubmit);
+            el.dataset.initialized = true;
+        }
+    });
+
+
+</script>
 </body>
 
 </html>
