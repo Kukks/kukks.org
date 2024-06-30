@@ -15,9 +15,9 @@ document.addEventListener("DOMContentLoaded", function() {
         pauseFire= !pauseFire;
         const button = document.getElementById('pause-button');
         if (pauseFire) {
-            button.innerHTML = '▶<span class="tooltip">Resume</span>';
+            button.innerHTML = '▶<span class="tooltip">Resume animation</span>';
         } else {
-            button.innerHTML = '⏸<span class="tooltip">Pause</span>';
+            button.innerHTML = '⏸<span class="tooltip">Pause animation</span>';
         }
     });
     
