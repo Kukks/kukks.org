@@ -6,152 +6,156 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kukks - Software Consultancy</title>
-    <!--    <link type="text/css" href="/assets/css/btcpayserver-variables.css" rel="stylesheet" />-->
-    <!--    <link type="text/css" href="/assets/css/btcpayserver-bootstrap.css" rel="stylesheet" />-->
-    <!--    <link type="text/css" href="/assets/css/btcpayserver-main.css" rel="stylesheet" />-->
-
     <style>
-        h1 {
-            font-size: 3rem;
-            margin: 0;
-        }
-
-        p.lead {
-            font-size: 2.5rem;
-            margin: 2rem;
-        }
-
+    h1 {
+        font-size: 3rem;
+        margin: 0;
+    }
+    p.lead {
+        font-size: 2.5rem;
+        margin: 2rem;
+    }
+    body, html {
+        color: white;
+        font-family: 'Courier New', monospace;
+        margin: 2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+    }
+    #bg {
+        background: linear-gradient(180deg, #00001c 0%, rgba(0, 0, 0, 1) 80%, rgba(0, 0, 0, 1) 100%);
+        width: 100%;
+        height: 100%;
+        left: 0;
+        top: 0;
+        position: fixed;
+        z-index: -100;
+    }
+    a {
+        color: white;
+        text-decoration: none;
+    }
+    a:hover {
+        font-weight: bold;
+    }
+    .box-container {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .box {
+        border-radius: 5%;
+        background-color: rgba(255, 255, 255, 0.2);
+        margin: 10px;
+        padding: 10px;
+        text-align: center;
+        flex: 1;
+        min-width: 150px;
+    }
+    a.box:hover {
+        background-color: rgba(255, 255, 255, 0.4);
+    }
+    #fire {
+        z-index: -1;
+        height: 100%;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+    }
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.4);
+        align-items: center;
+        justify-content: center;
+    }
+    .modal-content {
+        background-color: #fefefe;
+        margin: auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 80%;
+    }
+    .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+    }
+    .close:hover,
+    .close:focus {
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    #pause-button {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background-color: rgba(0, 0, 0, 0.0);
+        border: none;
+        color: white;
+        padding: 10px;
+        border-radius: 33%;
+        cursor: pointer;
+    }
+    #pause-button:hover {
+        background-color: rgba(0, 0, 0, 0.9);
+    }
+    #pause-button .tooltip {
+        position: absolute;
+        top: 50px;
+        right: 50px;
+        transform: translateX(50%);
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 5px;
+        border-radius: 5px;
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    #pause-button:hover .tooltip {
+        visibility: visible;
+        opacity: 1;
+    }
+    @media (max-width: 768px) {
         body, html {
-            /*backjgropund color gradient of dark blue fading to black*/
-            color: white;
-            font-family: 'Courier New', monospace;
-            margin: 2rem;
-
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            margin: 1rem;
         }
-
-
-        #bg {
-            background: linear-gradient(180deg, #00001c 0%, rgba(0, 0, 0, 1) 80%, rgba(0, 0, 0, 1) 100%);
-            width: 100%;
-            height: 100%;
-            left: 0;
-            top: 0;
-            position: fixed;
-            z-index: -100;
-        }
-
-        a {
-            color: white;
-            text-decoration: none;
-        }
-
-        a:hover {
-            font-weight: bold;
-        }
-
-        .box-container {
-
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
         .box {
-            border-radius: 5%;
-            background-color: rgba(255, 255, 255, 0.2);
-
-            margin: 10px;
-            padding: 10px;
+            padding: 8px;
+            margin: 5px;
         }
-
-        a.box:hover {
-            background-color: rgba(255, 255, 255, 0.4);
+    }
+    @media (max-width: 480px) {
+        h1 {
+            font-size: 2rem;
         }
-
-        #fire {
-            z-index: -1;
-            height: 100%;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
+        p.lead {
+            font-size: 1.5rem;
+            margin: 1rem;
         }
-
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0, 0, 0, 0.4);
+        .box-container {
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
         }
-
-        .modal-content {
-            background-color: #fefefe;
-            margin: auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 80%;
+        .box {
+            width: 100%;
+            margin: 5px 0;
         }
-
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-        }
-
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-        #pause-button {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background-color: rgba(0, 0, 0, 0.0);
-            border: none;
-            color: white;
-            padding: 10px;
-            border-radius: 33%;
-            cursor: pointer;
-        }
-
-
-        #pause-button:hover {
-            background-color: rgba(0, 0, 0, 0.9);
-        }
-
-        #pause-button .tooltip {
-            position: absolute;
-            top: 50px;
-            right: 50px;
-            transform: translateX(50%);
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 5px;
-            border-radius: 5px;
-            visibility: hidden;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        #pause-button:hover .tooltip {
-            visibility: visible;
-            opacity: 1;
-        }
-    </style>
+    }
+</style>
 </head>
 
 <body>
