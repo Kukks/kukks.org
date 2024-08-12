@@ -1,6 +1,4 @@
-﻿
-
-document.addEventListener("DOMContentLoaded", function() {
+﻿document.addEventListener("DOMContentLoaded", function () {
 
     let pauseFire = false;
     // document.addEventListener('visibilitychange', function() {
@@ -11,8 +9,8 @@ document.addEventListener("DOMContentLoaded", function() {
     //         pauseFire = false;
     //     }
     // });
-    document.getElementById("pause-button").addEventListener('click', ()=> {
-        pauseFire= !pauseFire;
+    document.getElementById("pause-button").addEventListener('click', () => {
+        pauseFire = !pauseFire;
         const button = document.getElementById('pause-button');
         if (pauseFire) {
             button.innerHTML = '▶<span class="tooltip">Resume animation</span>';
@@ -20,65 +18,102 @@ document.addEventListener("DOMContentLoaded", function() {
             button.innerHTML = '⏸<span class="tooltip">Pause animation</span>';
         }
     });
-    
+
     var mousex;
     var mousey;
     var mouseFire = false;
-    window.onresize = function() { location.reload(); }
-    window.onmousemove = function(event) {
+    // window.onresize = function() { location.reload(); }
+    window.onmousemove = function (event) {
         mousex = event.clientX;
         mousey = event.clientY;
     }
-    window.onmouseout = function(event) {
+    window.onmouseout = function (event) {
         mouseFire = false;
     }
-    window.onmouseover = function(event) {
+    window.onmouseover = function (event) {
         mouseFire = false;
     }
 
-    var canvas = document.getElementById('fire');
-    var ctx = canvas.getContext('2d');
+    function init(existingHeatField) {
+        var canvas = document.getElementById('fire');
+        var ctx = canvas.getContext('2d');
 
-    var pixelSize = 6
-    tw = window.innerWidth;
-    if (tw > 1200) { // Probably have a 4k display
-        pixelSize = 10;
-    }
-
-    // Make sure pixels are aligned
-    if (tw % (pixelSize) != 0) {
-        tw -= (tw % pixelSize);
-    }
-    canvas.width = tw;
-    canvas.height = window.innerHeight;
-var fps = 40;
-    var canvasWidth = Math.trunc(canvas.width / pixelSize);
-    var canvasHeight = Math.trunc(canvas.height / pixelSize);
-
-    var imageData = new ImageData(canvas.width, canvas.height);
-    var data = imageData.data;
-    var time = new Date().getTime();
-
-    // Init background
-    for (let i = 0; i < canvas.height; i++) {
-        let base_index = i * canvas.width * 4;
-        for (let j = 0; j < canvas.width; j++) {
-            let index = base_index + j * 4;
-            data[index] = 0;
-            data[index + 1] = 0;
-            data[index + 2] = 0;
-            data[index + 3] = 0;
+        var pixelSize = 6
+        tw = window.innerWidth;
+        if (tw > 1200) { // Probably have a 4k display
+            pixelSize = 10;
         }
-    }
 
-    var heatField = [];
-    for (let y = 0; y < canvasHeight; y++) {
-        let yi = y * canvasWidth;
-        for (let x = 0; x < canvasWidth; x++) {
-            heatField[yi + x] = 0;
+        // Make sure pixels are aligned
+        if (tw % (pixelSize) != 0) {
+            tw -= (tw % pixelSize);
         }
+        canvas.width = tw;
+        canvas.height = window.innerHeight;
+        var fps = 40;
+        var canvasWidth = Math.trunc(canvas.width / pixelSize);
+        var canvasHeight = Math.trunc(canvas.height / pixelSize);
+
+        var imageData = new ImageData(canvas.width, canvas.height);
+        var data = imageData.data;
+        var time = new Date().getTime();
+
+        // Init background
+        for (let i = 0; i < canvas.height; i++) {
+            let base_index = i * canvas.width * 4;
+            for (let j = 0; j < canvas.width; j++) {
+                let index = base_index + j * 4;
+                data[index] = 0;
+                data[index + 1] = 0;
+                data[index + 2] = 0;
+                data[index + 3] = 0;
+            }
+        }
+
+        // Init heat field
+        
+        var heatField = [];
+        if(existingHeatField){
+            //compute based on old heatfield
+            for (let y = 0; y < canvasHeight; y++) {
+                let yi = y * canvasWidth;
+                for (let x = 0; x < canvasWidth; x++) {
+                    heatField[yi + x] = existingHeatField[yi + x];
+                }
+            }
+        }else{
+            for (let y = 0; y < canvasHeight; y++) {
+                let yi = y * canvasWidth;
+                for (let x = 0; x < canvasWidth; x++) {
+                    heatField[yi + x] = 0;
+                }
+            }
+        }
+      
+        return {canvas, ctx, pixelSize, fps, canvasWidth, canvasHeight, imageData, data, time, heatField};
     }
 
+    var {canvas, ctx, pixelSize, fps, canvasWidth, canvasHeight, imageData, data, time, heatField} = init();
+
+    // window.onresize = function() { location.reload(); }
+    window.onresize = function() {
+        //set the original vars with thisi result
+         const r = init(heatField);
+            canvas = r.canvas;
+            
+            ctx = r.ctx;
+            pixelSize = r.pixelSize;
+            fps = r.fps;
+            canvasWidth = r.canvasWidth;
+            canvasHeight = r.canvasHeight;
+            imageData = r.imageData;
+            data = r.data;
+            time = r.time;
+             heatField = r.heatField
+            
+        
+         
+    }
     var heatTransfer = 0.99;
     var fireMoveThreshold = 0;
     var lastTime = 0;
@@ -87,9 +122,9 @@ var fps = 40;
     function processFire() {
         // request animation frame
         window.requestAnimationFrame(processFire);
-        
-        if(pauseFire || document.hidden) return;
-        
+
+        if (pauseFire || document.hidden) return;
+
         var now = new Date().getTime();
         dt = now - time;
         if (dt < (1000 / fps))
@@ -112,15 +147,15 @@ var fps = 40;
             }
         }
 
-        
+
         //randomly do a fire in the screen
-        
+
         // Add new heat at mouse
-        if (Math.floor(Math.random() * 11) >7) {
+        if (Math.floor(Math.random() * 11) > 7) {
 
             let index = Math.floor(Math.random() * (canvasWidth * canvasHeight));
             // let index = parseInt(mousey / pixelSize) * canvasWidth + parseInt(mousex / pixelSize);
-            let heat_amount = Math.random() - 0.1; 
+            let heat_amount = Math.random() - 0.1;
             heatField[index] += heat_amount;
             if (index > 2) {
                 heatField[index - 1] += heat_amount;
@@ -139,31 +174,31 @@ var fps = 40;
             for (let x = 0; x < canvasWidth; x++) {
                 let heat_amount = heatTransfer * heatField[base_index + x];
 
-                if (noise.simplex3(x / 100, (y-1) / 100, now * 100) > fireMoveThreshold) {
+                if (noise.simplex3(x / 100, (y - 1) / 100, now * 100) > fireMoveThreshold) {
                     heatField[base_index - canvasWidth + x] = heat_amount;
                 } else {
                     if (x > 0) {
                         if (Math.random() > 0.85) {
-                            heatField[base_index - canvasWidth + (x-1)] = heat_amount;
+                            heatField[base_index - canvasWidth + (x - 1)] = heat_amount;
                             continue;
                         }
                     }
                     if (x < canvas.width - 1) {
                         if (Math.random() > 0.85) {
                             //if (noise.simplex3((x+1) / 100, (y-1) / 100, now * 100) > fireMoveThreshold) {
-                            heatField[base_index - canvasWidth + (x+1)] = heat_amount;
+                            heatField[base_index - canvasWidth + (x + 1)] = heat_amount;
                             continue;
                         }
                     }
                     if (x > 0) {
                         if (Math.random() > 0.5) {
-                            heatField[base_index + (x-1)] = heat_amount;
+                            heatField[base_index + (x - 1)] = heat_amount;
                             continue;
                         }
                     }
                     if (x < canvas.width - 1) {
                         if (Math.random() > 0.5) {
-                            heatField[base_index + (x+1)] = heat_amount;
+                            heatField[base_index + (x + 1)] = heat_amount;
                         }
                     }
                 }
