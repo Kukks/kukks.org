@@ -1,162 +1,511 @@
 <!DOCTYPE html>
-<html lang="en" class="uie" data-theme="dark">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Kukks - Software Consultancy</title>
+    <title>Kukks - Freedom tech for an unfree world</title>
+    <meta name="description" content="Andrew Camilleri, online as Kukks. CTO of Ark Labs, building Arkade on Bitcoin.">
+    <meta name="theme-color" content="#00001c">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://kukks.org/">
+    <meta property="og:title" content="Kukks">
+    <meta property="og:description" content="Freedom tech for an unfree world">
+    <meta property="og:image" content="https://kukks.org/assets/og.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 11' shape-rendering='crispEdges'%3E%3Cpath fill='%2300001c' d='M0 0h11v11H0z'/%3E%3Cpath fill='%23ff8020' d='M2 1h2v9H2zM7 1h2v1H7zM6 2h2v1H6zM5 3h2v1H5zM4 4h2v1H4zM4 5h1v1H4zM4 6h2v1H4zM5 7h2v1H5zM6 8h2v1H6zM7 9h2v1H7z'/%3E%3C/svg%3E">
+    <link rel="preload" href="assets/fonts/DepartureMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+    <script>
+        if (window.WebGL2RenderingContext) {
+            document.documentElement.classList.add('fire');
+            if (!matchMedia('(prefers-reduced-motion: reduce)').matches && innerHeight >= 500) document.documentElement.classList.add('deck');
+        }
+    </script>
     <style>
-    h1 {
-        font-size: 3rem;
+    @font-face {
+        font-family: "Departure Mono";
+        src: url("assets/fonts/DepartureMono-Regular.woff2") format("woff2");
+        font-display: swap;
+    }
+    /* Palette is the old fire.js heat ramp plus the original #00001c night sky. */
+    :root {
+        --night: #00001c;
+        --ember: #ff4010;
+        --flame: #ff8020;
+        --coal: #400000;
+        --white-hot: #ffffc8;
+        --bone: #e6e1d3;
+        --ash: #9d9ab0;
+        --smoke: #2e2a3a;
+        --u: 3px;
+        --fs-s: 16.5px;
+        --fs: 16.5px;
+        --fs-l: 22px;
+        color-scheme: dark;
+        background: #000;
+        color: var(--bone);
+        font: var(--fs)/1.5 "Departure Mono", ui-monospace, "Courier New", monospace;
+    }
+    /* Departure Mono is drawn on an 11px grid, so sizes stay on multiples of 5.5. */
+    @media (min-width: 720px) {
+        :root {
+            --u: 4px;
+            --fs: 22px;
+            --fs-l: 33px;
+        }
+    }
+    body {
         margin: 0;
     }
-    p.lead {
-        font-size: 2.5rem;
-        margin: 2rem;
-    }
-    body, html {
-        color: white;
-        font-family: 'Courier New', monospace;
-        margin: 2rem;
-        
-        
-        
-    }
-    #bg {
-        background: linear-gradient(180deg, #00001c 0%, rgba(0, 0, 0, 1) 80%, rgba(0, 0, 0, 1) 100%);
-        width: 100%;
-        height: 100%;
-        left: 0;
-        top: 0;
+    body::before {
+        content: "";
         position: fixed;
-        z-index: -100;
+        inset: 0;
+        z-index: -2;
+        background: linear-gradient(var(--night), #000 80%);
     }
-    a {
-        color: white;
-        text-decoration: none;
+    ::selection {
+        background: var(--ember);
+        color: #000;
     }
-    a:hover {
-        font-weight: bold;
+    :focus-visible {
+        outline: var(--u) solid var(--white-hot);
+        outline-offset: var(--u);
     }
-    .container{
+    .frame {
+        --edge: var(--smoke);
+        --edge-top: var(--edge);
+        box-shadow: 0 calc(var(--u) * -1) var(--edge-top), 0 var(--u) var(--edge),
+            calc(var(--u) * -1) 0 var(--edge), var(--u) 0 var(--edge);
+    }
+
+    #fire {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: -1;
+        image-rendering: pixelated;
+        pointer-events: none;
+    }
+    html:not(.fire) #fire,
+    html:not(.fire) #pause {
+        display: none;
+    }
+    #pause {
+        position: absolute;
+        top: calc(var(--u) * 4);
+        right: calc(var(--u) * 4);
+        z-index: 2;
+        padding: 12px;
+        border: 0;
+        background: rgb(0 0 8 / .7);
+        color: var(--bone);
+        cursor: pointer;
+    }
+    #pause:hover {
+        color: var(--white-hot);
+    }
+    #pause svg {
+        display: block;
+        width: 21px;
+        height: 21px;
+        fill: currentColor;
+        shape-rendering: crispEdges;
+    }
+    .i-play,
+    .paused .i-pause {
+        display: none;
+    }
+    .paused .i-play {
+        display: inline;
+    }
+
+    .hero {
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
+        padding: 9svh calc(var(--u) * 4) 6svh;
+        text-align: center;
     }
-    .box-container {
+    .wordmark {
+        margin: 0;
+        font: clamp(66px, 18vw, 198px)/1 "Departure Mono", monospace;
+        color: var(--flame);
+    }
+    .fire .wordmark span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+    .tagline {
+        margin: calc(var(--u) * 5) 0 0;
+        font-size: var(--fs-l);
+        text-wrap: balance;
+    }
+
+    .slide {
+        box-sizing: border-box;
+        width: min(100% - var(--u) * 4, 60ch);
+        margin: 0 auto 8svh;
+    }
+    .slide.wide {
+        width: min(100% - var(--u) * 4, 68ch);
+    }
+    .slab {
+        padding: calc(var(--u) * 6) calc(var(--u) * 5);
+        background: rgb(0 0 10 / .9);
+        --edge-top: var(--ember);
+    }
+    .slab p,
+    .slab h2 {
+        margin: 0 0 1em;
+        text-wrap: pretty;
+    }
+    .slab > :last-child {
+        margin-bottom: 0;
+    }
+    .slab .lead,
+    .slab .statement {
+        font-size: var(--fs-l);
+        line-height: 1.33;
+    }
+    .slab .lead,
+    .slab h2 {
+        color: var(--white-hot);
+    }
+    .slab h2 {
+        font: inherit;
+    }
+    .slab p a {
+        color: var(--flame);
+        text-decoration-thickness: 2px;
+        text-underline-offset: .25em;
+    }
+    .slab p a:hover {
+        color: var(--white-hot);
+    }
+    .who {
+        color: var(--ash);
+    }
+    /* Padding keeps each chip's pixel frame inside the list box, which forge.js masks when it burns. */
+    .quick {
+        box-sizing: border-box;
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
+        gap: calc(var(--u) * 3);
+        width: fit-content;
+        max-width: 100%;
+        margin: calc(var(--u) * 5) auto 0;
+        padding: var(--u);
+        list-style: none;
+        font-size: var(--fs-s);
     }
-    .box {
-        border-radius: calc(1rem + 0.25vw);
-        background-color: rgba(255, 255, 255, 0.2);
-        margin: 10px;
-        padding: 10px;
-        text-align: center;
-        flex: 1;
-        min-width: 150px;
+    .quick a {
+        display: block;
+        padding: var(--u) calc(var(--u) * 3);
+        background: rgb(0 0 10 / .7);
+        color: var(--white-hot);
+        text-decoration: none;
     }
-    a.box:hover {
-        background-color: rgba(255, 255, 255, 0.4);
+    .deck .quick {
+        image-rendering: pixelated;
+        mask-repeat: no-repeat;
+        mask-position: 0 0;
+        -webkit-mask-repeat: no-repeat;
+        -webkit-mask-position: 0 0;
     }
-    #fire {
-        z-index: -1;
+    .deck .quick.gone {
+        visibility: hidden;
+    }
+
+    .links {
+        display: grid;
+        gap: 0 calc(var(--u) * 8);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .links a {
+        display: flex;
+        justify-content: space-between;
+        gap: 2ch;
+        padding: calc(var(--u) * 3) calc(var(--u) * 2);
+        color: var(--white-hot);
+        text-decoration: none;
+        background: linear-gradient(90deg, var(--smoke) 50%, #0000 0) 0 100% / calc(var(--u) * 2) var(--u) repeat-x;
+        transition: background-color .2s steps(2);
+    }
+    .links span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--ash);
+    }
+    .links a:hover,
+    .links a:focus-visible,
+    .quick a:hover,
+    .quick a:focus-visible,
+    .copy:hover {
+        background-color: var(--coal);
+    }
+    .links a:hover span,
+    .links a:focus-visible span {
+        color: var(--flame);
+    }
+
+    .pgp {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: calc(var(--u) * 2) 2ch;
+        margin-top: calc(var(--u) * 8);
+        font-size: var(--fs-s);
+    }
+    .pgp a {
+        color: var(--white-hot);
+    }
+    .pgp code {
+        font: inherit;
+        color: var(--ash);
+    }
+    .pgp code span {
+        white-space: nowrap;
+    }
+    .copy {
+        padding: 0 calc(var(--u) * 2);
+        border: 0;
+        background: #0000;
+        color: var(--white-hot);
+        font: inherit;
+        cursor: pointer;
+    }
+
+    /* Deck mode: the page never scrolls; forge.js burns the current slide away and assembles the next. */
+    .deck,
+    .deck body {
         height: 100%;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
     }
-    .modal {
-        display: none;
-        position: fixed;
+    .deck body {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        height: 100svh;
+    }
+    .deck .hero {
+        padding: max(9svh, 66px) calc(var(--u) * 4) 0;
+    }
+    .deck .stage {
+        display: grid;
+        place-items: center;
+        min-height: 0;
+        padding: calc(var(--u) * 4) calc(var(--u) * 2);
+    }
+    .deck .slide {
+        grid-area: 1 / 1;
+        width: min(100%, 60ch);
+        max-height: 100%;
+        margin: 0;
+        padding: var(--u);
+        overflow-y: auto;
+        scrollbar-width: none;
+        opacity: 0;
+        pointer-events: none;
+        image-rendering: pixelated;
+        mask-repeat: no-repeat;
+        mask-position: 0 0;
+        -webkit-mask-repeat: no-repeat;
+        -webkit-mask-position: 0 0;
+    }
+    .deck .slide.wide {
+        width: min(100%, 68ch);
+    }
+    /* forge.js adds .tight when a slide would overflow the stage, so one scroll is always one transition. */
+    .deck .slide.tight {
+        --fs-l: var(--fs);
+    }
+    .deck .slide.tight .slab {
+        padding: calc(var(--u) * 5) calc(var(--u) * 6);
+    }
+    .deck .slide.tight .links a {
+        padding-block: calc(var(--u) * 1.5);
+    }
+    .deck .slide.tight .pgp {
+        margin-top: calc(var(--u) * 4);
+    }
+    .deck .slide.on,
+    .deck .slide.out {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .deck .slide.out {
         z-index: 1;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        overflow: auto;
-        background-color: rgba(0, 0, 0, 0.4);
+    }
+    .deck-ui {
+        display: none;
+    }
+    .deck .deck-ui {
+        display: flex;
         align-items: center;
         justify-content: center;
+        gap: calc(var(--u) * 4);
+        padding: 0 calc(var(--u) * 2) calc(var(--u) * 4);
     }
-    .modal-content {
-        background-color: #fefefe;
-        margin: auto;
-        padding: 20px;
-        border: 1px solid #888;
-        width: 80%;
+    .pager {
+        display: flex;
     }
-    .close {
-        color: #aaa;
-        float: right;
-        font-size: 28px;
-        font-weight: bold;
-    }
-    .close:hover,
-    .close:focus {
-        color: black;
-        text-decoration: none;
+    .pager button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        min-height: 28px;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: var(--ash);
+        font: inherit;
+        font-size: var(--fs-s);
         cursor: pointer;
+        --dot: var(--smoke);
     }
-    #pause-button {
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        background-color: rgba(0, 0, 0, 0.0);
-        border: none;
-        color: white;
-        padding: 10px;
-        border-radius: calc(1rem + 0.25vw);
-        cursor: pointer;
+    .pager button::after {
+        content: "";
+        width: 10px;
+        height: 10px;
+        background: var(--dot);
     }
-    #pause-button:hover {
-        background-color: rgba(0, 0, 0, 0.9);
+    .pager button:hover {
+        --dot: var(--ash);
+        color: var(--bone);
     }
-    #pause-button .tooltip {
+    .pager button[aria-current="true"] {
+        --dot: var(--flame);
+        color: var(--white-hot);
+    }
+    .pager span {
         position: absolute;
-        top: 50px;
-        right: 50px;
-        transform: translateX(50%);
-        background-color: rgba(0, 0, 0, 0.7);
-        color: white;
-        padding: 5px;
-        border-radius: 5px;
-        visibility: hidden;
-        opacity: 0;
-        transition: opacity 0.2s;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
     }
-    #pause-button:hover .tooltip {
-        visibility: visible;
-        opacity: 1;
+    .next {
+        display: flex;
+        align-items: center;
+        gap: 1.5ch;
+        padding: var(--u) calc(var(--u) * 3);
+        border: 0;
+        background: rgb(0 0 10 / .8);
+        color: var(--white-hot);
+        font: inherit;
+        font-size: var(--fs-s);
+        cursor: pointer;
+        --edge-top: var(--ember);
     }
-    @media (max-width: 768px) {
-        body, html {
-            margin: 1rem;
-        }
-        .box {
-            padding: 8px;
-            margin: 5px;
+    .next:hover {
+        background: var(--coal);
+    }
+    .next svg {
+        width: 14px;
+        height: 14px;
+        fill: var(--flame);
+        shape-rendering: crispEdges;
+    }
+    .go-name {
+        color: var(--flame);
+    }
+    .go-back,
+    .last .go-on {
+        display: none;
+    }
+    .last .go-back {
+        display: inline;
+    }
+    .last .next svg {
+        rotate: 180deg;
+    }
+    html:not(.moved) .next svg {
+        animation: bob 1s steps(2, jump-none) infinite;
+    }
+    @keyframes bob {
+        to {
+            translate: 0 3px;
         }
     }
-    @media (max-width: 480px) {
-        h1 {
-            font-size: 2rem;
+    @media (hover: none) {
+        .by-wheel {
+            display: none;
         }
-        p.lead {
-            font-size: 1.5rem;
-            margin: 1rem;
+    }
+    @media (hover: hover) {
+        .by-touch {
+            display: none;
         }
-        .box-container {
+    }
+
+    @media (min-width: 720px) {
+        .slab {
+            padding: calc(var(--u) * 10) calc(var(--u) * 11);
+        }
+        .links {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    /* Wide screens list the sections by name; phones rely on the next button and the burning name for progress. */
+    @media (min-width: 1200px) {
+        .deck .pager {
+            position: fixed;
+            top: 50%;
+            right: calc(var(--u) * 6);
+            translate: 0 -50%;
             flex-direction: column;
-            align-items: center;
+            align-items: flex-end;
         }
-        .box {
-            /*width: 100%;*/
-            margin: 5px 0;
+        .deck .pager button {
+            gap: 1.5ch;
+        }
+        .deck .pager span {
+            position: static;
+            width: auto;
+            height: auto;
+            clip-path: none;
+        }
+    }
+    @media (max-width: 719px) {
+        .deck .pager {
+            display: none;
+        }
+        /* The header chips burn away on the contact slide, so on phones it may grow up into their space (--lift). */
+        .deck .slide.wide {
+            align-self: end;
+            max-height: calc(100% + var(--lift, 0px));
+        }
+        .deck .tagline {
+            font-size: var(--fs);
+        }
+        .deck .stage {
+            padding-block: calc(var(--u) * 2);
+        }
+        .deck .links a {
+            padding-block: calc(var(--u) * 2);
+        }
+        .pgp {
+            margin-top: calc(var(--u) * 5);
+        }
+        .pgp code {
+            order: 1;
+            flex-basis: 100%;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .links a {
+            transition: none;
         }
     }
 </style>
@@ -164,127 +513,109 @@
 
 <body>
 
-<div id="bg"></div>
-<canvas id="fire"></canvas>
-<div class="container">
-    <div style="text-align: center">
-        <h1>Kukks Tech</h1>
-        <p class="lead">Freedom tech for an unfree world</p>
-    </div>
-
-
-    <!--    <div class="box-container">-->
-    <!--        <a class="box" href="https://www.kukks.org/bitcoin.pdf">Bitcoin</a>-->
-    <!--        <a class="box" href="https://btcpayserver.org">BTCPay Server</a>-->
-    <!--        <div class="box" onclick="openModal('modal2')">Coinjoin</div>-->
-    <!--        <div class="box" onclick="openModal('modal3')">Nostr</div>-->
-    <!--        <div class="box" onclick="openModal('modal4')">sdad</div>-->
-    <!--        <div class="box" onclick="openModal('modal5')">Contact</div>-->
-    <!--    </div>-->
-
-    <div class="box" >
-        <p>
-            My name is Andrew Camilleri, and usually go by the online handle Kukks.</p>
-        <p>
-            My passion is to build solutions that help empower others to reclaim their sovereignty, in a world that
-            moves to eradicate it.
-
-              Almost all my work revolves around <a href="bitcoin.pdf" target="_blank">Bitcoin</a>.
-            It's simply the greatest technology that I can work on to provide the most meaningful impact.
-            As the world around us tightens its grip on our freedoms, Bitcoin provides us a way to reclaim our financial
-            freedom and fight back.
-        </p>
-        <p>
-              I am currently CTO of <a href="https://arklabs.xyz" target="_blank">Ark Labs</a>, a <a href="bitcoin.pdf" target="_blank">Bitcoin</a> infrastructure provider building <a href="https://arkadeos.com" target="_blank">Arkade</a>, an execution layer that enables sophisticated financial applications while preserving Bitcoin's core security and decentralization properties.
-        </p>
-        <p>
-            Feel free to reach out to me on any of the following platforms:
-        </p>
-        <div class="box-container">
-
-            <a class="box" target="_blank"
-               href="https://x.com/mrkukks">X</a>
-            <a class="box" target="_blank"
-               href="nostr:npub1y24gz5gwucl79vtv4ctwpysl0r5m4xyzu2rgulnr44ks3t5mt92q4nz2ad">Nostr</a>
-            <a class="box" target="_blank"
-               href="https://signal.me/#eu/njn1nz-dziKTpDfuO5Cgg8B_OnkiMiH1R11vo0hXdGaLF0n9Yc9GCb1utRqLJV0m">Signal</a>
-            <a class="box" target="_blank"
-               href="https://t.me/mrkukks">Telegram</a>
-            <a class="box" target="_blank" href="https://github.com/Kukks">Github</a>
-            <a class="box" target="_blank" href="mailto:admin@kukks.org">Email</a> 
-            <!--<a class="box" target="_blank" href="https://keet-mobile.onelink.me/86GX/invite?af_qr=c">Keet</a>-->
-        </div>
-        <div class="box-container">
-            <a class="box" target="_blank"
-               href="https://github.com/Kukks.gpg">PGP: FB9A 23AC 5DA3 14EC D3D6 EDAC F918 A46E 2306 4E28</a>
-        </div>
-        <hr/>
-
-        <div style="text-align: center; display:none;">None of my work would be possible without the generous donations
-            of my peers. To date, I have
-            received 3 direct grants, two from Spiral and one from BTSE. Additionally, I am also funded through the <a
-                    target="_blank" href="https://foundation.btcpayserver.org/">BTCPay Foundation</a> which has had an
-            unbelievable lineup of sponsors through the years. I am forever grateful. I also accept
-            donations through:
-            <div class="box-container">
-                <a class="box" target="_blank"
-                   href="https://btcpay.kukks.org/api/v1/invoices?storeId=AGZDaipGt9WGwjdQ7cemFynFkZY3XxVbKVbV9izBNAA&currency=EUR">Bitcoin</a>
-                <a class="box"
-                   href="lightning:kukks@kukks.org">LN Address</a>
-                <a class="box" target="_blank" href="https://github.com/sponsors/Kukks">Github Sponsors</a>
-            </div>
-        </div>
-
-
-
-    </div>
-</div>
-
-
-
-
-<button id="pause-button">
-    ⏸
-    <span class="tooltip">Pause</span>
+<canvas id="fire" aria-hidden="true"></canvas>
+<button id="pause" class="frame" type="button" aria-pressed="false" aria-label="Pause animation">
+    <svg viewBox="0 0 7 7" aria-hidden="true">
+        <path class="i-pause" d="M1 1h2v5H1zM4 1h2v5H4z"/>
+        <path class="i-play" d="M1 1h1v5H1zM2 2h2v3H2zM4 3h2v1H4z"/>
+    </svg>
 </button>
 
-<script type="text/javascript" charset="utf-8" src="/assets/perlin.js"></script>
-<script type="text/javascript" charset="utf-8" src="/assets/fire.js"></script>
+<header class="hero">
+    <h1 class="wordmark"><span>Kukks</span></h1>
+    <p class="tagline">Freedom tech for an unfree world</p>
+    <ul class="quick">
+        <li><a class="frame" href="https://x.com/mrkukks" target="_blank">X</a></li>
+        <li><a class="frame" href="https://njump.me/npub1y24gz5gwucl79vtv4ctwpysl0r5m4xyzu2rgulnr44ks3t5mt92q4nz2ad" target="_blank">Nostr</a></li>
+        <li><a class="frame" href="https://signal.me/#eu/njn1nz-dziKTpDfuO5Cgg8B_OnkiMiH1R11vo0hXdGaLF0n9Yc9GCb1utRqLJV0m" target="_blank">Signal</a></li>
+        <li><a class="frame" href="https://t.me/mrkukks" target="_blank">Telegram</a></li>
+        <li><a class="frame" href="https://github.com/Kukks" target="_blank">GitHub</a></li>
+        <li><a class="frame" href="mailto:admin@kukks.org">Email</a></li>
+    </ul>
+</header>
+
+<main class="stage">
+    <section class="slide" aria-label="Intro">
+        <div class="slab frame">
+            <p class="lead">My name is Andrew Camilleri, and I usually go by the online handle Kukks.</p>
+            <p class="who">CTO of <a href="https://arklabs.xyz" target="_blank">Ark Labs</a>, building
+                <a href="https://arkadeos.com" target="_blank">Arkade</a>.</p>
+        </div>
+    </section>
+
+    <section class="slide" aria-label="Passion">
+        <div class="slab frame">
+            <p class="statement">My passion is to build solutions that help empower others to reclaim their sovereignty,
+                in a world that moves to eradicate it.</p>
+        </div>
+    </section>
+
+    <section class="slide" aria-label="Bitcoin">
+        <div class="slab frame">
+            <p class="statement">Almost all my work revolves around <a href="bitcoin.pdf" target="_blank">Bitcoin</a>.
+                It's simply the greatest technology that I can work on to provide the most meaningful impact. As the world
+                around us tightens its grip on our freedoms, Bitcoin provides us a way to reclaim our financial freedom and
+                fight back.</p>
+        </div>
+    </section>
+
+    <section class="slide" aria-label="Ark Labs">
+        <div class="slab frame">
+            <p class="statement">I am currently CTO of <a href="https://arklabs.xyz" target="_blank">Ark Labs</a>, a Bitcoin
+                infrastructure provider building <a href="https://arkadeos.com" target="_blank">Arkade</a>, an execution layer
+                that enables sophisticated financial applications while preserving Bitcoin's core security and
+                decentralization properties.</p>
+        </div>
+    </section>
+
+    <section class="slide wide" aria-label="Contact">
+        <div class="slab frame">
+            <h2>Feel free to reach out to me on any of the following platforms:</h2>
+            <ul class="links">
+                <li><a href="https://x.com/mrkukks" target="_blank">X <span>@mrkukks</span></a></li>
+                <li><a href="https://njump.me/npub1y24gz5gwucl79vtv4ctwpysl0r5m4xyzu2rgulnr44ks3t5mt92q4nz2ad" target="_blank">Nostr <span>npub1y24g…nz2ad</span></a></li>
+                <li><a href="https://signal.me/#eu/njn1nz-dziKTpDfuO5Cgg8B_OnkiMiH1R11vo0hXdGaLF0n9Yc9GCb1utRqLJV0m" target="_blank">Signal <span>Direct message</span></a></li>
+                <li><a href="https://t.me/mrkukks" target="_blank">Telegram <span>@mrkukks</span></a></li>
+                <li><a href="https://github.com/Kukks" target="_blank">GitHub <span>Kukks</span></a></li>
+                <li><a href="mailto:admin@kukks.org">Email <span>admin@kukks.org</span></a></li>
+            </ul>
+            <div class="pgp">
+                <a href="https://github.com/Kukks.gpg" target="_blank">PGP key</a>
+                <code><span>FB9A 23AC 5DA3 14EC D3D6</span> <span>EDAC F918 A46E 2306 4E28</span></code>
+                <button class="copy frame" type="button" aria-live="polite" data-copy="FB9A23AC5DA314ECD3D6EDACF918A46E23064E28">Copy</button>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer class="deck-ui">
+    <nav class="pager" aria-label="Sections">
+        <button type="button" aria-current="true"><span>Intro</span></button>
+        <button type="button"><span>Passion</span></button>
+        <button type="button"><span>Bitcoin</span></button>
+        <button type="button"><span>Ark Labs</span></button>
+        <button type="button"><span>Contact</span></button>
+    </nav>
+    <button class="next frame" type="button">
+        <svg viewBox="0 0 7 7" aria-hidden="true"><path d="M0 1h7v1H0zM1 2h5v1H1zM2 3h3v1H2zM3 4h1v1H3z"/></svg>
+        <span class="go-on"><span class="by-wheel">Scroll</span><span class="by-touch">Swipe up</span> to</span><span class="go-back">Back to</span>
+        <span class="go-name">Passion</span>
+    </button>
+</footer>
+
+<script src="assets/forge.js" onerror="document.documentElement.classList.remove('fire', 'deck')"></script>
 <script>
-    function openModal(modalId) {
-        document.getElementById(modalId).style.display = "flex";
-    }
-
-    function closeModal(modalId) {
-        document.getElementById(modalId).style.display = "none";
-    }
-
-    if (!window.btcpay) {
-        var script = document.createElement('script');
-        script.src = "https://btcpay.kukks.org/modal/btcpay.js";
-        document.getElementsByTagName('head')[0].append(script);
-    }
-
-    function handleFormSubmit(event) {
-        event.preventDefault();
-        var xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function () {
-            if (this.readyState == 4 && this.status == 200 && this.responseText) {
-                window.btcpay.appendInvoiceFrame(JSON.parse(this.responseText).invoiceId);
-            }
-        };
-        xhttp.open('POST', event.target.getAttribute('action'), true);
-        xhttp.send(new FormData(event.target));
-    }
-
-    document.querySelectorAll(".btcpay-form").forEach(function (el) {
-        if (!el.dataset.initialized) {
-            el.addEventListener('submit', handleFormSubmit);
-            el.dataset.initialized = true;
+    document.querySelector('.copy').addEventListener('click', async (e) => {
+        const button = e.currentTarget;
+        try {
+            await navigator.clipboard.writeText(button.dataset.copy);
+            button.textContent = 'Copied';
+        } catch {
+            getSelection().selectAllChildren(document.querySelector('.pgp code'));
+            button.textContent = 'Selected';
         }
+        setTimeout(() => button.textContent = 'Copy', 1600);
     });
-
-
 </script>
 </body>
 
