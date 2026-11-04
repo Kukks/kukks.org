@@ -15,7 +15,7 @@
   const K = {
     iters: 20, vorticity: 26, buoyancy: 85, smokeWeight: 8, velDiss: 0.5,
     cooling: 0.95, smokeGen: 0.3, smokeDiss: 0.65, letterHeat: 1.2, floor: 0.3,
-    stir: 14, burst: 140, sparkRate: 24, scrollCarry: 0.85,
+    stir: 14, burst: 140, sparkRate: 24, scrollCarry: 0.85, flareGap: 2.2,
     burnTime: 0.45, formDelay: 0.12, formTime: 0.45,
   };
 
@@ -72,6 +72,49 @@
     uniform sampler2D uB0, uB1, uB2;
     uniform vec4 uBR0, uBR1, uBR2;
     uniform vec2 uBP0, uBP1, uBP2;
+    // Scroll cues: up to two stacked 9x5 pixel chevrons below the slide (xy = centre, top row) and above it
+    // (zw = centre, bottom row; row < 0 hides). They light up one after another, away from the slide.
+    uniform vec4 uCues;
+    uniform vec2 uCueA, uCueN;
+    float cue(ivec2 c, vec2 at, bool up, float a, float n, float time) {
+      if (at.y < 0.0 || a <= 0.01) return 0.0;
+      int lx = c.x - int(at.x) + 4, ly = up ? c.y - int(at.y) : int(at.y) - c.y;
+      for (int k = 0; k < 2; k++) {
+        int ry = ly - k * 7;
+        if (float(k) < n && ry >= 0 && ry < 5 && lx >= 0 && lx < 9 && (abs(lx - 4) == 4 - ry || abs(lx - 4) == 3 - ry))
+          return a * (0.3 + 0.7 * max(0.0, sin(time * 4.0 - float(k) * 1.4)));
+      }
+      return 0.0;
+    }
+    float cues(ivec2 c, float time) {
+      return max(cue(c, uCues.xy, false, uCueA.x, uCueN.x, time), cue(c, uCues.zw, true, uCueA.y, uCueN.y, time));
+    }
+    // Up to three prominences: cubic loops from foot A to foot B (uLoopA) around controls C1, C2 (uLoopB);
+    // uLoopC = (grown, torn, intensity, half-width), intensity 0 = idle. Returns (distance / half-width, brightness).
+    uniform vec4 uLoopA[3], uLoopB[3], uLoopC[3];
+    vec2 loop(vec2 p, int i, float time) {
+      vec4 ab = uLoopA[i], cc = uLoopB[i], g = uLoopC[i];
+      if (g.z <= 0.0) return vec2(1e3, 0.0);
+      vec2 lo = min(min(ab.xy, ab.zw), min(cc.xy, cc.zw)) - 4.0, hi = max(max(ab.xy, ab.zw), max(cc.xy, cc.zw)) + 4.0;
+      if (any(lessThan(p, lo)) || any(greaterThan(p, hi))) return vec2(1e3, 0.0);
+      vec2 prev = ab.xy;
+      float best = 1e3, along = 0.0;
+      for (int k = 1; k <= 16; k++) {
+        float s = float(k) / 16.0, r = 1.0 - s;
+        vec2 q = r * r * r * ab.xy + 3.0 * r * s * (r * cc.xy + s * cc.zw) + s * s * s * ab.zw, e = q - prev;
+        float h = clamp(dot(p - prev, e) / max(dot(e, e), 1e-4), 0.0, 1.0), d = length(p - prev - e * h);
+        if (d < best) {
+          best = d;
+          along = s - (1.0 - h) / 16.0;
+        }
+        prev = q;
+      }
+      // Lit from both feet up to the grown length and torn open from the top; knots stream up from the brighter feet.
+      float m = min(along, 1.0 - along);
+      float shown = m < g.x * 0.5 && m <= 0.5 - g.y * 0.5 ? 1.0 : 0.0;
+      float feet = 1.0 + 0.5 * (1.0 - smoothstep(0.0, 0.1, m));
+      return vec2(best / g.w, g.z * shown * feet * (0.6 + 0.4 * sin(m * 40.0 - time * 8.0)));
+    }
   `;
 
   const CURL = HEAD + `
@@ -126,6 +169,11 @@
           * (0.6 + 0.8 * noise(vec2(c) * 0.4 - vec2(0.0, uTime * 6.0))));
       }
       f.x = max(f.x, max(front(uB0, uBR0, uBP0, c), max(front(uB1, uBR1, uBP1, c), front(uB2, uBR2, uBP2, c))));
+      f.x = max(f.x, cues(c, uTime) * 0.7);
+      for (int i = 0; i < 3; i++) {
+        vec2 r = loop(vec2(c) + 0.5, i, uTime);
+        if (r.x < 2.0) f.x = max(f.x, 0.9 * r.y * (1.0 - r.x * 0.5));
+      }
       if (c.y < 2) f.x = max(f.x, uFloor * smoothstep(0.45, 1.0, noise(vec2(float(c.x) * 0.15, uTime * 0.8))));
       o = f;
     }`;
@@ -228,6 +276,12 @@
       int fi = int(floor(f.x * 9.0 + b - 1.0));
       if (fi >= 0) col = FIRE[min(fi, 7)];
       col = glow(uB2, uBR2, uBP2, c, b, glow(uB1, uBR1, uBP1, c, b, glow(uB0, uBR0, uBP0, c, b, col)));
+      float cv = cues(c, uTime);
+      if (cv > 0.0) col = FIRE[clamp(ramp(cv + 0.15 * (noise(vec2(c) * 0.7 + uTime * 3.0) - 0.5), b), 1, 7)];
+      for (int i = 0; i < 3; i++) {
+        vec2 r = loop(vec2(c) - uShift + 0.5, i, uTime);
+        if (r.x < 1.0 && r.y > 0.05) col = FIRE[clamp(ramp(r.y * (1.0 - 0.4 * r.x), b), 2, 7)];
+      }
       ivec2 m = c - ivec2(uOrigin);
       vec4 t = mtex(m);
       if (t.z > uDissolve && t.x > 0.0) {
@@ -300,6 +354,7 @@
         gl.bindTexture(gl.TEXTURE_2D, v.tex);
         gl.uniform1i(loc, unit++);
       } else if (typeof v === 'number') gl.uniform1f(loc, v);
+      else if (v.v4) gl.uniform4fv(loc, v.v4);
       else if (v instanceof Float32Array) gl.uniform1fv(loc, v);
       else if (v.length === 2) gl.uniform2f(loc, v[0], v[1]);
       else gl.uniform4f(loc, v[0], v[1], v[2], v[3]);
@@ -400,6 +455,7 @@
     }
     targets = [];
     sparks = [];
+    loops.length = 0;
     canvas.width = W;
     canvas.height = H;
     canvas.style.width = W * P + 'px';
@@ -478,6 +534,74 @@
       meteor = null;
       meteorIn = 7 + Math.random() * 10;
     }
+  }
+
+  // Solar prominences: loops of fire with both feet on the burning name. They grow out of their feet, stream
+  // plasma and fade; some erupt, ballooning outward until the top tears open in a burst. Big loops bulge off the
+  // K and S where there is room beside the name, small ones arch over the letter tops. Charcoal cannot flare.
+  const loops = [];
+  const loopU = { uLoopA: { v4: new Float32Array(12) }, uLoopB: { v4: new Float32Array(12) }, uLoopC: { v4: new Float32Array(12) } };
+  let loopIn = 1;
+  const pick = (a) => a[(Math.random() * a.length) | 0];
+
+  function newLoop() {
+    const d = 2 + Math.random() * 1.4, erupt = Math.random() < 0.35, grow = erupt ? 1.7 : 1;
+    const left = origin[0] - 4, right = Math.min(W, pagerLeft) - origin[0] - MW - 4, above = H - origin[1] - MH - 2;
+    const side = left > 16 && (right <= 16 || Math.random() < 0.5) ? -1 : right > 16 ? 1 : 0;
+    if (side && Math.random() < 0.75) {
+      const edge = ign[side < 0 ? 0 : 4] === 1 ? pix.filter(([x, , thr]) => x === (side < 0 ? 0 : MW - 1) && thr > dissolve) : [];
+      if (edge.length < 4) return null;
+      const y1 = pick(edge)[1], far = edge.filter(([, y]) => Math.abs(y - y1) >= MH * 0.3);
+      if (!far.length) return null;
+      const y2 = pick(far)[1], lean = Math.random() * 0.45 - 0.1, x = side < 0 ? 0 : MW;
+      const room = Math.min(side < 0 ? left : right, 16 + Math.random() * 44), a = [x, Math.max(y1, y2) + 1], b = [x, Math.min(y1, y2)];
+      return { a, b, n: [side, lean], h: room / 0.75 / grow, s: (a[1] - b[1]) * 0.45, w: 1.6, t: 0, d, erupt, grow };
+    }
+    if (above < 6) return null;
+    const hot = tops.filter(([, y, i, thr]) => y === MH && ign[i] === 1 && thr > dissolve);
+    if (!hot.length) return null;
+    const ax = pick(hot)[0] + 0.5, near = hot.filter(([x]) => Math.abs(x - ax) >= 6 && Math.abs(x - ax) <= 30);
+    if (!near.length) return null;
+    const bx = pick(near)[0] + 0.5;
+    return { a: [ax, MH], b: [bx, MH], n: [0, 1], h: Math.min(above, 5 + Math.random() * 12) / 0.75, s: Math.abs(bx - ax) * 0.35, w: 1.2, t: 0, d, erupt, grow };
+  }
+
+  // Cubic loop from foot a to foot b; both controls stand out along n and spread apart, which bulges it into an omega.
+  function loopPts(l, swell) {
+    const len = Math.hypot(l.b[0] - l.a[0], l.b[1] - l.a[1]), ux = (l.b[0] - l.a[0]) / len, uy = (l.b[1] - l.a[1]) / len;
+    const h = l.h * swell, s = l.s * swell;
+    return [l.a, [l.a[0] + l.n[0] * h - ux * s, l.a[1] + l.n[1] * h - uy * s], [l.b[0] + l.n[0] * h + ux * s, l.b[1] + l.n[1] * h + uy * s], l.b];
+  }
+  const bez = (p, s) => [0, 1].map((k) => (1 - s) ** 3 * p[0][k] + 3 * (1 - s) ** 2 * s * p[1][k] + 3 * (1 - s) * s * s * p[2][k] + s ** 3 * p[3][k]);
+  const clamp01 = (v) => Math.min(Math.max(v, 0), 1);
+
+  function moveLoops(dt) {
+    if ((loopIn -= dt) < 0 && loops.length < 3) {
+      loopIn = K.flareGap * (0.4 + 0.8 * Math.random());
+      const l = newLoop();
+      if (l) {
+        loops.push(l);
+        for (const [x, y] of [l.a, l.b]) splat(field, [origin[0] + x, origin[1] + y], [0.8, 0, 0, 0], 5);
+      }
+    }
+    for (let i = loops.length; i--;) if ((loops[i].t += dt) >= loops[i].d) loops.splice(i, 1);
+    const A = loopU.uLoopA.v4, B = loopU.uLoopB.v4, C = loopU.uLoopC.v4;
+    C.fill(0);
+    loops.forEach((l, i) => {
+      const u = l.t / l.d, e = clamp01((u - 0.45) / 0.35), torn = l.erupt ? clamp01((u - 0.8) / 0.2) : 0;
+      const p = loopPts(l, 1 + (l.grow - 1) * e * e * (3 - 2 * e)).map(([x, y]) => [origin[0] + x, origin[1] + y]);
+      if (torn > 0 && !l.burst) {
+        l.burst = true;
+        bursts.push([...bez(p, 0.5), 0.35]);
+      }
+      A.set([...p[0], ...p[3]], i * 4);
+      B.set([...p[1], ...p[2]], i * 4);
+      C.set([Math.min(1, u / 0.3), torn, l.erupt ? 1 : Math.min(1, (1 - u) / 0.3), l.w], i * 4);
+      if (Math.random() < 0.5) {
+        const s = Math.random() * Math.min(1, u / 0.3) / 2;
+        spawn(...bez(p, Math.random() < 0.5 ? s : 1 - s), 1, 8, 10);
+      }
+    });
   }
 
   const ign = new Float32Array(5);
@@ -568,7 +692,12 @@
   // Each burnable is snapped onto the fire's pixel grid so its mask pixels line up with the glow drawn behind it.
   function layoutBurnables() {
     if (!deck) return;
-    root.style.setProperty('--lift', `${stageEl.getBoundingClientRect().top - chips.el.getBoundingClientRect().top}px`);
+    const sr = stageEl.getBoundingClientRect();
+    root.style.setProperty('--lift', `${sr.top - chips.el.getBoundingClientRect().top}px`);
+    stageTop = Math.round(sr.top / P);
+    stageBot = Math.round(sr.bottom / P);
+    const pr = pagerEl.getBoundingClientRect();
+    pagerLeft = pr.width && pr.left > innerWidth * 0.6 ? Math.floor(pr.left / P) : W;
     for (const s of slides) {
       s.el.classList.remove('tight');
       if (s.el.scrollHeight > s.el.clientHeight + 1) s.el.classList.add('tight');
@@ -659,7 +788,24 @@
     if (i === lastSlide) rebirth = true;
   }
 
+  // Burning chevrons below/above the current slide show there is more to scroll to; they fade out mid-transition
+  // and only draw as many chevrons (0-2) as fit between the slide and the stage edge.
+  let cueA = 0, stageTop = 0, stageBot = 0, pagerLeft = Infinity;
+  const pagerEl = document.querySelector('.pager');
+  const cueU = { uCues: [0, -1, 0, -1], uCueA: [0, 0], uCueN: [0, 0] };
+  function updateCues(dt) {
+    cueA += ((deck && !busy() ? 1 : 0) - cueA) * Math.min(1, dt * 5);
+    const s = slides[cur];
+    if (!deck || !s.w) return void (cueU.uCues = [0, -1, 0, -1]);
+    const cx = s.x0 + Math.floor(s.w / 2), fit = (space) => (space >= 12 ? 2 : space >= 5 ? 1 : 0);
+    const nNext = cur < lastSlide ? fit(stageBot - s.y0 - s.h - 2) : 0, nPrev = cur > 0 ? fit(s.y0 - stageTop - 2) : 0;
+    cueU.uCues = [cx, nNext ? H - 1 - (s.y0 + s.h + 2) : -1, cx, nPrev ? H - 1 - (s.y0 - 3) : -1];
+    cueU.uCueA = [cueA, cueA * 0.75];
+    cueU.uCueN = [nNext, nPrev];
+  }
+
   function tickDeck(dt) {
+    updateCues(dt);
     stars += (cur * 40 - stars) * Math.min(1, dt * 3);
     flare *= Math.exp(-dt * 3);
     // Until the visitor first moves, the next button smoulders so the way forward is hard to miss.
@@ -729,10 +875,11 @@
       splat(field, [ptr.x, ptr.y], [Math.min(Math.hypot(ptr.dx, ptr.dy) * 0.04, 0.5), 0, 0, 0], 6);
       ptr.dx = ptr.dy = 0;
     }
-    for (const [x, y] of bursts.splice(0)) {
-      splat(vel, [x, y], [K.burst, 0, 0, 0], 40, 1);
-      splat(field, [x, y], [1.5, 0.3, 0, 0], 20);
-      spawn(x, y, 36, 70, 10);
+    moveLoops(dt);
+    for (const [x, y, k = 1] of bursts.splice(0)) {
+      splat(vel, [x, y], [K.burst * k, 0, 0, 0], 40 * k, 1);
+      splat(field, [x, y], [1.5 * k, 0.3 * k, 0, 0], 20 * k);
+      spawn(x, y, Math.round(36 * k), 70 * k, 10);
     }
     // Phoenix: arriving on the last slide, the charred name re-ignites with a fireball, an updraft and a plume.
     if (rebirth) {
@@ -747,7 +894,7 @@
     }
     run(sourceP, field.write, {
       uField: field.read, uMask: maskTex, uOrigin: origin, uIgn: ign, uTime: tt, uHeat: K.letterHeat * (1 + flare),
-      uFloor: K.floor, uDissolve: dissolve, ...burnUniforms(),
+      uFloor: K.floor, uDissolve: dissolve, ...burnUniforms(), ...cueU, ...loopU,
     });
     field.swap();
     run(divP, div, { uVel: vel.read });
@@ -772,7 +919,7 @@
     const shift = paused ? origin[1] - frozenAt : 0;
     run(displayP, null, {
       uField: field.read, uMask: maskTex, uOrigin: origin, uShift: [0, shift], uIgn: ign,
-      uTime: t % 600, uDissolve: dissolve, uStars: deck ? stars : scrollY / P * 0.25, ...burnUniforms(),
+      uTime: t % 600, uDissolve: dissolve, uStars: deck ? stars : scrollY / P * 0.25, ...burnUniforms(), ...cueU, ...loopU,
     });
     drawSparks(shift);
   }
@@ -899,11 +1046,11 @@
       e.preventDefault();
       return go(e.key === 'Home' ? 0 : slides.length - 1);
     }
-    const dir = { ArrowDown: 1, PageDown: 1, ArrowUp: -1, PageUp: -1, ' ': e.shiftKey ? -1 : 1 }[e.key];
+    const dir = { ArrowDown: 1, ArrowRight: 1, PageDown: 1, ArrowUp: -1, ArrowLeft: -1, PageUp: -1, ' ': e.shiftKey ? -1 : 1 }[e.key];
     if (!dir || (e.key === ' ' && e.target.closest('a, button'))) return;
     e.preventDefault();
     const s = slides[cur].el;
-    if (e.key.startsWith('Arrow') && canScroll(s, dir)) return void (s.scrollTop += dir * 40);
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && canScroll(s, dir)) return void (s.scrollTop += dir * 40);
     nav(dir);
   });
 
@@ -911,7 +1058,7 @@
   addEventListener('touchstart', (e) => {
     const s = slides[cur].el;
     touch = deck && e.touches.length === 1
-      ? { y: e.touches[0].clientY, inside: s.contains(e.target), up: canScroll(s, -1), down: canScroll(s, 1) } : null;
+      ? { x: e.touches[0].clientX, y: e.touches[0].clientY, inside: s.contains(e.target), up: canScroll(s, -1), down: canScroll(s, 1) } : null;
   }, { passive: true });
   addEventListener('touchmove', (e) => {
     if (!touch || e.touches.length > 1) return;
@@ -922,7 +1069,9 @@
     const tc = touch;
     touch = null;
     if (!tc) return;
-    const dy = tc.y - e.changedTouches[0].clientY;
+    const dx = tc.x - e.changedTouches[0].clientX, dy = tc.y - e.changedTouches[0].clientY;
+    // Sideways swipes page like vertical ones: swipe left for the next slide, right for the previous.
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 45) return nav(Math.sign(dx));
     if (Math.abs(dy) > 45 && !(tc.inside && (dy > 0 ? tc.down : tc.up))) nav(Math.sign(dy));
   }, { passive: true });
 
