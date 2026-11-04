@@ -15,7 +15,7 @@
   const K = {
     iters: 20, vorticity: 26, buoyancy: 85, smokeWeight: 8, velDiss: 0.5,
     cooling: 0.95, smokeGen: 0.3, smokeDiss: 0.65, letterHeat: 1.2, floor: 0.3,
-    stir: 14, burst: 140, sparkRate: 24, scrollCarry: 0.85, flareGap: 2.2,
+    stir: 14, burst: 140, sparkRate: 24, scrollCarry: 0.85, flareGap: 1.3,
     burnTime: 0.45, formDelay: 0.12, formTime: 0.45,
   };
 
@@ -89,9 +89,9 @@
     float cues(ivec2 c, float time) {
       return max(cue(c, uCues.xy, false, uCueA.x, uCueN.x, time), cue(c, uCues.zw, true, uCueA.y, uCueN.y, time));
     }
-    // Up to three prominences: cubic loops from foot A to foot B (uLoopA) around controls C1, C2 (uLoopB);
+    // Up to four prominences: cubic loops from foot A to foot B (uLoopA) around controls C1, C2 (uLoopB);
     // uLoopC = (grown, torn, intensity, half-width), intensity 0 = idle. Returns (distance / half-width, brightness).
-    uniform vec4 uLoopA[3], uLoopB[3], uLoopC[3];
+    uniform vec4 uLoopA[4], uLoopB[4], uLoopC[4];
     vec2 loop(vec2 p, int i, float time) {
       vec4 ab = uLoopA[i], cc = uLoopB[i], g = uLoopC[i];
       if (g.z <= 0.0) return vec2(1e3, 0.0);
@@ -170,7 +170,7 @@
       }
       f.x = max(f.x, max(front(uB0, uBR0, uBP0, c), max(front(uB1, uBR1, uBP1, c), front(uB2, uBR2, uBP2, c))));
       f.x = max(f.x, cues(c, uTime) * 0.7);
-      for (int i = 0; i < 3; i++) {
+      for (int i = 0; i < 4; i++) {
         vec2 r = loop(vec2(c) + 0.5, i, uTime);
         if (r.x < 2.0) f.x = max(f.x, 0.9 * r.y * (1.0 - r.x * 0.5));
       }
@@ -278,7 +278,7 @@
       col = glow(uB2, uBR2, uBP2, c, b, glow(uB1, uBR1, uBP1, c, b, glow(uB0, uBR0, uBP0, c, b, col)));
       float cv = cues(c, uTime);
       if (cv > 0.0) col = FIRE[clamp(ramp(cv + 0.15 * (noise(vec2(c) * 0.7 + uTime * 3.0) - 0.5), b), 1, 7)];
-      for (int i = 0; i < 3; i++) {
+      for (int i = 0; i < 4; i++) {
         vec2 r = loop(vec2(c) - uShift + 0.5, i, uTime);
         if (r.x < 1.0 && r.y > 0.05) col = FIRE[clamp(ramp(r.y * (1.0 - 0.4 * r.x), b), 2, 7)];
       }
@@ -537,18 +537,47 @@
   }
 
   // Solar prominences: loops of fire with both feet on the burning name. They grow out of their feet, stream
-  // plasma and fade; some erupt, ballooning outward until the top tears open in a burst. Big loops bulge off the
-  // K and S where there is room beside the name, small ones arch over the letter tops. Charcoal cannot flare.
+  // plasma and fade; some erupt, ballooning outward until the top tears open in a burst. Most hang from the name's
+  // underside into the page; others bulge off the K and S or arch over the letter tops. Charcoal cannot flare.
   const loops = [];
-  const loopU = { uLoopA: { v4: new Float32Array(12) }, uLoopB: { v4: new Float32Array(12) }, uLoopC: { v4: new Float32Array(12) } };
+  const loopU = { uLoopA: { v4: new Float32Array(16) }, uLoopB: { v4: new Float32Array(16) }, uLoopC: { v4: new Float32Array(16) } };
   let loopIn = 1;
   const pick = (a) => a[(Math.random() * a.length) | 0];
+  const inRect = (r, x, y) => x > r[0] && x < r[2] && y > r[1] && y < r[3];
+  const artRect = (el, pad = 0) => {
+    const r = el.getBoundingClientRect();
+    return [r.left / P - pad, H - r.bottom / P - pad, r.right / P + pad, H - r.top / P + pad];
+  };
 
   function newLoop() {
-    const d = 2 + Math.random() * 1.4, erupt = Math.random() < 0.35, grow = erupt ? 1.7 : 1;
-    const left = origin[0] - 4, right = Math.min(W, pagerLeft) - origin[0] - MW - 4, above = H - origin[1] - MH - 2;
+    const d = 2.2 + Math.random() * 1.6, erupt = Math.random() < 0.35, grow = erupt ? 1.6 : 1, roll = Math.random();
+    const below = origin[1] - 3, above = H - origin[1] - MH - 2;
+    const left = origin[0] - 4, right = Math.min(W, pagerLeft) - origin[0] - MW - 4;
     const side = left > 16 && (right <= 16 || Math.random() < 0.5) ? -1 : right > 16 ? 1 : 0;
-    if (side && Math.random() < 0.75) {
+    if (below > 20 && roll < (side ? 0.65 : 0.85)) {
+      const feet = pix.filter(([x, y, thr]) => y === 0 && thr > dissolve && ign[(x / ((GW + GAP) * S)) | 0] === 1);
+      if (!feet.length) return null;
+      const ax = pick(feet)[0] + 0.5, near = feet.filter(([x]) => Math.abs(x - ax) >= 6 && Math.abs(x - ax) <= 36);
+      if (!near.length) return null;
+      const bx = pick(near)[0] + 0.5, span = Math.abs(bx - ax), card = artRect(slides[deck ? cur : 0].el), pager = artRect(pagerEl, 2);
+      const l = { a: [ax, 0], b: [bx, 0], n: [((ax + bx) / MW - 1) * 0.9 + Math.random() * 0.4 - 0.2, -1], h: below * (0.5 + 0.4 * Math.random()) / 0.75 / grow, w: 1.8, t: 0, d, erupt, grow };
+      // Lean less while it leaves the screen or covers the pager; hang shorter while its low arc hides behind the slide.
+      for (let k = 0; k < 12; k++) {
+        l.s = span * 0.5 + l.h * 0.15;
+        const p = loopPts(l, grow);
+        let out = false, hid = false;
+        for (let j = 0; j <= 20; j++) {
+          const [x, y] = bez(p, j / 20), px = x + origin[0], py = y + origin[1];
+          out ||= px < 2 || px > W - 2 || inRect(pager, px, py);
+          hid ||= j > 4 && j < 16 && inRect(card, px, py);
+        }
+        if (!out && !hid) return l;
+        if (out) l.n[0] *= 0.7;
+        else l.h *= 0.8;
+      }
+      return null;
+    }
+    if (side && roll < 0.9) {
       const edge = ign[side < 0 ? 0 : 4] === 1 ? pix.filter(([x, , thr]) => x === (side < 0 ? 0 : MW - 1) && thr > dissolve) : [];
       if (edge.length < 4) return null;
       const y1 = pick(edge)[1], far = edge.filter(([, y]) => Math.abs(y - y1) >= MH * 0.3);
@@ -576,7 +605,7 @@
   const clamp01 = (v) => Math.min(Math.max(v, 0), 1);
 
   function moveLoops(dt) {
-    if ((loopIn -= dt) < 0 && loops.length < 3) {
+    if ((loopIn -= dt) < 0 && loops.length < 4) {
       loopIn = K.flareGap * (0.4 + 0.8 * Math.random());
       const l = newLoop();
       if (l) {
@@ -592,7 +621,7 @@
       const p = loopPts(l, 1 + (l.grow - 1) * e * e * (3 - 2 * e)).map(([x, y]) => [origin[0] + x, origin[1] + y]);
       if (torn > 0 && !l.burst) {
         l.burst = true;
-        bursts.push([...bez(p, 0.5), 0.35]);
+        bursts.push([...bez(p, 0.5), Math.min(0.6, 0.2 + l.h / 150)]);
       }
       A.set([...p[0], ...p[3]], i * 4);
       B.set([...p[1], ...p[2]], i * 4);
