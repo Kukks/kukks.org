@@ -15,7 +15,7 @@
   const K = {
     iters: 20, vorticity: 26, buoyancy: 85, smokeWeight: 8, velDiss: 0.5,
     cooling: 0.95, smokeGen: 0.3, smokeDiss: 0.65, letterHeat: 1.2, floor: 0.3,
-    stir: 14, burst: 140, sparkRate: 24, scrollCarry: 0.85, flareGap: 1.3,
+    stir: 14, burst: 140, sparkRate: 24, scrollCarry: 0.85, blastGap: 0.7,
     burnTime: 0.45, formDelay: 0.12, formTime: 0.45,
   };
 
@@ -89,32 +89,6 @@
     float cues(ivec2 c, float time) {
       return max(cue(c, uCues.xy, false, uCueA.x, uCueN.x, time), cue(c, uCues.zw, true, uCueA.y, uCueN.y, time));
     }
-    // Up to four prominences: cubic loops from foot A to foot B (uLoopA) around controls C1, C2 (uLoopB);
-    // uLoopC = (grown, torn, intensity, half-width), intensity 0 = idle. Returns (distance / half-width, brightness).
-    uniform vec4 uLoopA[4], uLoopB[4], uLoopC[4];
-    vec2 loop(vec2 p, int i, float time) {
-      vec4 ab = uLoopA[i], cc = uLoopB[i], g = uLoopC[i];
-      if (g.z <= 0.0) return vec2(1e3, 0.0);
-      vec2 lo = min(min(ab.xy, ab.zw), min(cc.xy, cc.zw)) - 4.0, hi = max(max(ab.xy, ab.zw), max(cc.xy, cc.zw)) + 4.0;
-      if (any(lessThan(p, lo)) || any(greaterThan(p, hi))) return vec2(1e3, 0.0);
-      vec2 prev = ab.xy;
-      float best = 1e3, along = 0.0;
-      for (int k = 1; k <= 16; k++) {
-        float s = float(k) / 16.0, r = 1.0 - s;
-        vec2 q = r * r * r * ab.xy + 3.0 * r * s * (r * cc.xy + s * cc.zw) + s * s * s * ab.zw, e = q - prev;
-        float h = clamp(dot(p - prev, e) / max(dot(e, e), 1e-4), 0.0, 1.0), d = length(p - prev - e * h);
-        if (d < best) {
-          best = d;
-          along = s - (1.0 - h) / 16.0;
-        }
-        prev = q;
-      }
-      // Lit from both feet up to the grown length and torn open from the top; knots stream up from the brighter feet.
-      float m = min(along, 1.0 - along);
-      float shown = m < g.x * 0.5 && m <= 0.5 - g.y * 0.5 ? 1.0 : 0.0;
-      float feet = 1.0 + 0.5 * (1.0 - smoothstep(0.0, 0.1, m));
-      return vec2(best / g.w, g.z * shown * feet * (0.6 + 0.4 * sin(m * 40.0 - time * 8.0)));
-    }
   `;
 
   const CURL = HEAD + `
@@ -136,7 +110,7 @@
       vec2 f = vec2(T - B, R - L);
       f *= uVort * at(uCurl, c).x / (length(f) + 1e-4) * vec2(1.0, -1.0);
       vec4 s = at(uField, c);
-      o = vec4(at(uVel, c).xy + (f + vec2(0.0, s.x * uBuoy - s.y * uWeight)) * uDt, 0.0, 1.0);
+      o = vec4(at(uVel, c).xy + (f + vec2(0.0, (s.x + 0.2 * s.z) * uBuoy - s.y * uWeight)) * uDt, 0.0, 1.0);
     }`;
 
   const SPLAT = HEAD + `
@@ -170,10 +144,6 @@
       }
       f.x = max(f.x, max(front(uB0, uBR0, uBP0, c), max(front(uB1, uBR1, uBP1, c), front(uB2, uBR2, uBP2, c))));
       f.x = max(f.x, cues(c, uTime) * 0.7);
-      for (int i = 0; i < 4; i++) {
-        vec2 r = loop(vec2(c) + 0.5, i, uTime);
-        if (r.x < 2.0) f.x = max(f.x, 0.9 * r.y * (1.0 - r.x * 0.5));
-      }
       if (c.y < 2) f.x = max(f.x, uFloor * smoothstep(0.45, 1.0, noise(vec2(float(c.x) * 0.15, uTime * 0.8))));
       o = f;
     }`;
@@ -225,14 +195,15 @@
     }`;
 
   // Noisy cooling that scrolls upward with the flames carves them into tongues; lost heat becomes smoke.
+  // Flare plasma (z) burns like heat but barely rises and cools slower, so blasts billow where they erupt.
   const ADVECT_FIELD = HEAD + BACKTRACE + `
     uniform sampler2D uVel, uSrc;
     uniform float uDt, uCool, uSmoke, uSmokeDiss, uTime;
     void main() {
       vec4 f = back(uSrc, texelFetch(uVel, C(), 0).xy, uDt);
       float n = noise(gl_FragCoord.xy * vec2(0.21, 0.13) - vec2(0.0, uTime * 5.0));
-      float h = max(f.x - uCool * (0.3 + 1.4 * n) * uDt, 0.0);
-      o = vec4(h, (f.y + (f.x - h) * uSmoke) / (1.0 + uSmokeDiss * uDt), 0.0, 1.0);
+      float h = max(f.x - uCool * (0.3 + 1.4 * n) * uDt, 0.0), q = max(f.z - uCool * (0.25 + 1.2 * n) * uDt, 0.0);
+      o = vec4(h, (f.y + (f.x - h + f.z - q) * uSmoke) / (1.0 + uSmokeDiss * uDt), q, 1.0);
     }`;
 
   // Mask texel: r = letter id, g = top-exposed (emits heat), b = dissolve threshold.
@@ -273,15 +244,11 @@
       vec4 f = floorCopy || any(lessThan(fc, ivec2(0))) || any(greaterThanEqual(fc, ivec2(res))) ? vec4(0.0) : texelFetch(uField, fc, 0);
       int si = int(floor(f.y * 3.0 + b - 1.0));
       if (si >= 0) col = SMOKE[min(si, 2)];
-      int fi = int(floor(f.x * 9.0 + b - 1.0));
+      int fi = int(floor(max(f.x, f.z) * 9.0 + b - 1.0));
       if (fi >= 0) col = FIRE[min(fi, 7)];
       col = glow(uB2, uBR2, uBP2, c, b, glow(uB1, uBR1, uBP1, c, b, glow(uB0, uBR0, uBP0, c, b, col)));
       float cv = cues(c, uTime);
       if (cv > 0.0) col = FIRE[clamp(ramp(cv + 0.15 * (noise(vec2(c) * 0.7 + uTime * 3.0) - 0.5), b), 1, 7)];
-      for (int i = 0; i < 4; i++) {
-        vec2 r = loop(vec2(c) - uShift + 0.5, i, uTime);
-        if (r.x < 1.0 && r.y > 0.05) col = FIRE[clamp(ramp(r.y * (1.0 - 0.4 * r.x), b), 2, 7)];
-      }
       ivec2 m = c - ivec2(uOrigin);
       vec4 t = mtex(m);
       if (t.z > uDissolve && t.x > 0.0) {
@@ -354,7 +321,6 @@
         gl.bindTexture(gl.TEXTURE_2D, v.tex);
         gl.uniform1i(loc, unit++);
       } else if (typeof v === 'number') gl.uniform1f(loc, v);
-      else if (v.v4) gl.uniform4fv(loc, v.v4);
       else if (v instanceof Float32Array) gl.uniform1fv(loc, v);
       else if (v.length === 2) gl.uniform2f(loc, v[0], v[1]);
       else gl.uniform4f(loc, v[0], v[1], v[2], v[3]);
@@ -455,7 +421,7 @@
     }
     targets = [];
     sparks = [];
-    loops.length = 0;
+    pops.length = 0;
     canvas.width = W;
     canvas.height = H;
     canvas.style.width = W * P + 'px';
@@ -536,101 +502,45 @@
     }
   }
 
-  // Solar prominences: loops of fire with both feet on the burning name. They grow out of their feet, stream
-  // plasma and fade; some erupt, ballooning outward until the top tears open in a burst. Most hang from the name's
-  // underside into the page; others bulge off the K and S or arch over the letter tops. Charcoal cannot flare.
-  const loops = [];
-  const loopU = { uLoopA: { v4: new Float32Array(16) }, uLoopB: { v4: new Float32Array(16) }, uLoopC: { v4: new Float32Array(16) } };
-  let loopIn = 1;
+  // Solar flares: explosive blasts from the burning name, mostly off its underside into the page. Each fires a ragged
+  // fan of jets of random strength, width and direction with plasma behind them, so the fluid tears every one into its
+  // own billows and mushroom clouds. Most are small; big ones flash the name and keep popping. Charcoal cannot flare.
+  const pops = [];
+  let blastIn = 1;
   const pick = (a) => a[(Math.random() * a.length) | 0];
-  const inRect = (r, x, y) => x > r[0] && x < r[2] && y > r[1] && y < r[3];
-  const artRect = (el, pad = 0) => {
-    const r = el.getBoundingClientRect();
-    return [r.left / P - pad, H - r.bottom / P - pad, r.right / P + pad, H - r.top / P + pad];
-  };
 
-  function newLoop() {
-    const d = 2.2 + Math.random() * 1.6, erupt = Math.random() < 0.35, grow = erupt ? 1.6 : 1, roll = Math.random();
-    const below = origin[1] - 3, above = H - origin[1] - MH - 2;
-    const left = origin[0] - 4, right = Math.min(W, pagerLeft) - origin[0] - MW - 4;
-    const side = left > 16 && (right <= 16 || Math.random() < 0.5) ? -1 : right > 16 ? 1 : 0;
-    if (below > 20 && roll < (side ? 0.65 : 0.85)) {
-      const feet = pix.filter(([x, y, thr]) => y === 0 && thr > dissolve && ign[(x / ((GW + GAP) * S)) | 0] === 1);
-      if (!feet.length) return null;
-      const ax = pick(feet)[0] + 0.5, near = feet.filter(([x]) => Math.abs(x - ax) >= 6 && Math.abs(x - ax) <= 36);
-      if (!near.length) return null;
-      const bx = pick(near)[0] + 0.5, span = Math.abs(bx - ax), card = artRect(slides[deck ? cur : 0].el), pager = artRect(pagerEl, 2);
-      const l = { a: [ax, 0], b: [bx, 0], n: [((ax + bx) / MW - 1) * 0.9 + Math.random() * 0.4 - 0.2, -1], h: below * (0.5 + 0.4 * Math.random()) / 0.75 / grow, w: 1.8, t: 0, d, erupt, grow };
-      // Lean less while it leaves the screen or covers the pager; hang shorter while its low arc hides behind the slide.
-      for (let k = 0; k < 12; k++) {
-        l.s = span * 0.5 + l.h * 0.15;
-        const p = loopPts(l, grow);
-        let out = false, hid = false;
-        for (let j = 0; j <= 20; j++) {
-          const [x, y] = bez(p, j / 20), px = x + origin[0], py = y + origin[1];
-          out ||= px < 2 || px > W - 2 || inRect(pager, px, py);
-          hid ||= j > 4 && j < 16 && inRect(card, px, py);
-        }
-        if (!out && !hid) return l;
-        if (out) l.n[0] *= 0.7;
-        else l.h *= 0.8;
-      }
-      return null;
+  function blast(x, y, nx, ny, s, secondary) {
+    const at = Math.atan2(ny, nx), fan = 1.8 + 1.8 * Math.random(), z = Math.min(Math.max(W / 70, 1.4), 2);
+    for (let k = 3 + Math.round(s * 6); k--;) {
+      const a = at + (Math.random() - 0.5) * fan, v = (80 + 320 * s) * (0.5 + Math.random()), r = (6 + 80 * s * Math.random()) * z * z;
+      const o = (Math.random() - 0.5) * 8 * s * z, p = [x - ny * o, y + nx * o];
+      splat(vel, p, [Math.cos(a) * v, Math.sin(a) * v, 0, 0], r);
+      splat(field, p, [0, 0.05, (0.35 + 0.4 * s) * (0.6 + 0.4 * Math.random()), 0], r * 0.7);
     }
-    if (side && roll < 0.9) {
-      const edge = ign[side < 0 ? 0 : 4] === 1 ? pix.filter(([x, , thr]) => x === (side < 0 ? 0 : MW - 1) && thr > dissolve) : [];
-      if (edge.length < 4) return null;
-      const y1 = pick(edge)[1], far = edge.filter(([, y]) => Math.abs(y - y1) >= MH * 0.3);
-      if (!far.length) return null;
-      const y2 = pick(far)[1], lean = Math.random() * 0.45 - 0.1, x = side < 0 ? 0 : MW;
-      const room = Math.min(side < 0 ? left : right, 16 + Math.random() * 44), a = [x, Math.max(y1, y2) + 1], b = [x, Math.min(y1, y2)];
-      return { a, b, n: [side, lean], h: room / 0.75 / grow, s: (a[1] - b[1]) * 0.45, w: 1.6, t: 0, d, erupt, grow };
+    spawn(x, y, Math.round(8 + 60 * s), (40 + 140 * s) * z, 6);
+    if (secondary) return;
+    flare = Math.max(flare, s * s * 0.8);
+    for (let k = Math.round(s * 5 * Math.random()); k--;) {
+      const d = (4 + 24 * s * Math.random()) * z, a = at + (Math.random() - 0.5) * fan;
+      pops.push({ t: 0.06 + 0.5 * Math.random(), x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, nx: Math.cos(a), ny: Math.sin(a), s: s * (0.3 + 0.4 * Math.random()) });
     }
-    if (above < 6) return null;
-    const hot = tops.filter(([, y, i, thr]) => y === MH && ign[i] === 1 && thr > dissolve);
-    if (!hot.length) return null;
-    const ax = pick(hot)[0] + 0.5, near = hot.filter(([x]) => Math.abs(x - ax) >= 6 && Math.abs(x - ax) <= 30);
-    if (!near.length) return null;
-    const bx = pick(near)[0] + 0.5;
-    return { a: [ax, MH], b: [bx, MH], n: [0, 1], h: Math.min(above, 5 + Math.random() * 12) / 0.75, s: Math.abs(bx - ax) * 0.35, w: 1.2, t: 0, d, erupt, grow };
   }
 
-  // Cubic loop from foot a to foot b; both controls stand out along n and spread apart, which bulges it into an omega.
-  function loopPts(l, swell) {
-    const len = Math.hypot(l.b[0] - l.a[0], l.b[1] - l.a[1]), ux = (l.b[0] - l.a[0]) / len, uy = (l.b[1] - l.a[1]) / len;
-    const h = l.h * swell, s = l.s * swell;
-    return [l.a, [l.a[0] + l.n[0] * h - ux * s, l.a[1] + l.n[1] * h - uy * s], [l.b[0] + l.n[0] * h + ux * s, l.b[1] + l.n[1] * h + uy * s], l.b];
-  }
-  const bez = (p, s) => [0, 1].map((k) => (1 - s) ** 3 * p[0][k] + 3 * (1 - s) ** 2 * s * p[1][k] + 3 * (1 - s) * s * s * p[2][k] + s ** 3 * p[3][k]);
-  const clamp01 = (v) => Math.min(Math.max(v, 0), 1);
-
-  function moveLoops(dt) {
-    if ((loopIn -= dt) < 0 && loops.length < 4) {
-      loopIn = K.flareGap * (0.4 + 0.8 * Math.random());
-      const l = newLoop();
-      if (l) {
-        loops.push(l);
-        for (const [x, y] of [l.a, l.b]) splat(field, [origin[0] + x, origin[1] + y], [0.8, 0, 0, 0], 5);
-      }
+  function moveBlasts(dt) {
+    for (let i = pops.length; i--;) {
+      const p = pops[i];
+      if ((p.t -= dt) > 0) continue;
+      pops.splice(i, 1);
+      blast(p.x, p.y, p.nx, p.ny, p.s, true);
     }
-    for (let i = loops.length; i--;) if ((loops[i].t += dt) >= loops[i].d) loops.splice(i, 1);
-    const A = loopU.uLoopA.v4, B = loopU.uLoopB.v4, C = loopU.uLoopC.v4;
-    C.fill(0);
-    loops.forEach((l, i) => {
-      const u = l.t / l.d, e = clamp01((u - 0.45) / 0.35), torn = l.erupt ? clamp01((u - 0.8) / 0.2) : 0;
-      const p = loopPts(l, 1 + (l.grow - 1) * e * e * (3 - 2 * e)).map(([x, y]) => [origin[0] + x, origin[1] + y]);
-      if (torn > 0 && !l.burst) {
-        l.burst = true;
-        bursts.push([...bez(p, 0.5), Math.min(0.6, 0.2 + l.h / 150)]);
-      }
-      A.set([...p[0], ...p[3]], i * 4);
-      B.set([...p[1], ...p[2]], i * 4);
-      C.set([Math.min(1, u / 0.3), torn, l.erupt ? 1 : Math.min(1, (1 - u) / 0.3), l.w], i * 4);
-      if (Math.random() < 0.5) {
-        const s = Math.random() * Math.min(1, u / 0.3) / 2;
-        spawn(...bez(p, Math.random() < 0.5 ? s : 1 - s), 1, 8, 10);
-      }
-    });
+    if ((blastIn -= dt) > 0) return;
+    blastIn = K.blastGap * (0.3 + 1.4 * Math.random());
+    const r = Math.random(), [nx, ny] = r < 0.55 ? [0, -1] : r < 0.7 ? [-1, 0] : r < 0.85 ? [1, 0] : [0, 1];
+    const rim = pix.filter(([x, y, thr]) => thr > dissolve && ign[(x / ((GW + GAP) * S)) | 0] === 1
+      && (ny < 0 ? y === 0 : ny > 0 ? y === MH - 1 : nx < 0 ? x === 0 : x === MW - 1));
+    if (!rim.length) return;
+    const [x, y] = pick(rim);
+    blast(origin[0] + x + 0.5 + nx, origin[1] + y + 0.5 + ny, nx, ny, Math.random() ** 2.2);
   }
 
   const ign = new Float32Array(5);
@@ -725,8 +635,6 @@
     root.style.setProperty('--lift', `${sr.top - chips.el.getBoundingClientRect().top}px`);
     stageTop = Math.round(sr.top / P);
     stageBot = Math.round(sr.bottom / P);
-    const pr = pagerEl.getBoundingClientRect();
-    pagerLeft = pr.width && pr.left > innerWidth * 0.6 ? Math.floor(pr.left / P) : W;
     for (const s of slides) {
       s.el.classList.remove('tight');
       if (s.el.scrollHeight > s.el.clientHeight + 1) s.el.classList.add('tight');
@@ -819,8 +727,7 @@
 
   // Burning chevrons below/above the current slide show there is more to scroll to; they fade out mid-transition
   // and only draw as many chevrons (0-2) as fit between the slide and the stage edge.
-  let cueA = 0, stageTop = 0, stageBot = 0, pagerLeft = Infinity;
-  const pagerEl = document.querySelector('.pager');
+  let cueA = 0, stageTop = 0, stageBot = 0;
   const cueU = { uCues: [0, -1, 0, -1], uCueA: [0, 0], uCueN: [0, 0] };
   function updateCues(dt) {
     cueA += ((deck && !busy() ? 1 : 0) - cueA) * Math.min(1, dt * 5);
@@ -904,7 +811,7 @@
       splat(field, [ptr.x, ptr.y], [Math.min(Math.hypot(ptr.dx, ptr.dy) * 0.04, 0.5), 0, 0, 0], 6);
       ptr.dx = ptr.dy = 0;
     }
-    moveLoops(dt);
+    moveBlasts(dt);
     for (const [x, y, k = 1] of bursts.splice(0)) {
       splat(vel, [x, y], [K.burst * k, 0, 0, 0], 40 * k, 1);
       splat(field, [x, y], [1.5 * k, 0.3 * k, 0, 0], 20 * k);
@@ -923,7 +830,7 @@
     }
     run(sourceP, field.write, {
       uField: field.read, uMask: maskTex, uOrigin: origin, uIgn: ign, uTime: tt, uHeat: K.letterHeat * (1 + flare),
-      uFloor: K.floor, uDissolve: dissolve, ...burnUniforms(), ...cueU, ...loopU,
+      uFloor: K.floor, uDissolve: dissolve, ...burnUniforms(), ...cueU,
     });
     field.swap();
     run(divP, div, { uVel: vel.read });
@@ -948,7 +855,7 @@
     const shift = paused ? origin[1] - frozenAt : 0;
     run(displayP, null, {
       uField: field.read, uMask: maskTex, uOrigin: origin, uShift: [0, shift], uIgn: ign,
-      uTime: t % 600, uDissolve: dissolve, uStars: deck ? stars : scrollY / P * 0.25, ...burnUniforms(), ...cueU, ...loopU,
+      uTime: t % 600, uDissolve: dissolve, uStars: deck ? stars : scrollY / P * 0.25, ...burnUniforms(), ...cueU,
     });
     drawSparks(shift);
   }
